@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -27,7 +29,8 @@ public class AuthController {
     public AuthResponse register(@Valid @RequestBody RegisterRequest req) {
         User user = userService.register(req.name(), req.email(), req.password(), req.role());
         String token = jwtUtil.generate(user.getEmail());
-        return new AuthResponse(token, user.getEmail(), user.getName());
+        List<String> roles = user.getRoles().stream().map(r -> r.getName().toLowerCase()).toList();
+        return new AuthResponse(token, user.getEmail(), user.getName(), roles);
     }
 
     @PostMapping("/login")
@@ -37,6 +40,7 @@ public class AuthController {
             throw new org.springframework.security.authentication.BadCredentialsException("Invalid password");
         }
         String token = jwtUtil.generate(user.getEmail());
-        return new AuthResponse(token, user.getEmail(), user.getName());
+        List<String> roles = user.getRoles().stream().map(r -> r.getName().toLowerCase()).toList();
+        return new AuthResponse(token, user.getEmail(), user.getName(), roles);
     }
 }

@@ -1,3 +1,5 @@
 package com.vehicle.management.api.dto;
 
-public record AuthResponse(String token, String email, String name) {}
+import java.util.List;
+
+public record AuthResponse(String token, String email, String name, List<String> roles) {}
