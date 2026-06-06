@@ -1,12 +1,12 @@
--- 001_initial_schema.sql
--- Corporate Vehicle Management System - Initial Schema
+-- V1__initial_schema.sql
+-- Corporate Vehicle Management System
 
 CREATE TABLE users (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name        VARCHAR(100) NOT NULL,
-    email       VARCHAR(255) NOT NULL UNIQUE,
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name          VARCHAR(100) NOT NULL,
+    email         VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE roles (
@@ -56,12 +56,9 @@ CREATE TABLE borrowing_requests (
     CONSTRAINT valid_period CHECK (period_end > period_start)
 );
 
-CREATE INDEX idx_borrowing_vehicle_period
-    ON borrowing_requests (vehicle_id, period_start, period_end);
-CREATE INDEX idx_borrowing_user
-    ON borrowing_requests (user_id);
-CREATE INDEX idx_borrowing_state
-    ON borrowing_requests (state);
+CREATE INDEX idx_borrowing_vehicle_period ON borrowing_requests (vehicle_id, period_start, period_end);
+CREATE INDEX idx_borrowing_user            ON borrowing_requests (user_id);
+CREATE INDEX idx_borrowing_state           ON borrowing_requests (state);
 
 CREATE TABLE maintenance_records (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -74,23 +71,4 @@ CREATE TABLE maintenance_records (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_maintenance_vehicle
-    ON maintenance_records (vehicle_id);
-
--- Seed: roles
-INSERT INTO roles (id, name) VALUES
-    ('00000000-0000-0000-0000-000000000001', 'admin'),
-    ('00000000-0000-0000-0000-000000000002', 'employee');
-
--- Seed: permissions
-INSERT INTO permissions (id, name) VALUES
-    ('00000000-0000-0000-0001-000000000001', 'APPROVE_BORROWING'),
-    ('00000000-0000-0000-0001-000000000002', 'MANAGE_VEHICLE'),
-    ('00000000-0000-0000-0001-000000000003', 'SUBMIT_REQUEST');
-
--- Seed: role_permissions
-INSERT INTO role_permissions (role_id, permission_id) VALUES
-    ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0001-000000000001'),
-    ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0001-000000000002'),
-    ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0001-000000000003'),
-    ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0001-000000000003');
+CREATE INDEX idx_maintenance_vehicle ON maintenance_records (vehicle_id);
