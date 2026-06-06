@@ -1,6 +1,8 @@
-package com.vehicle.management.domain.model;
+package com.vehicle.management.domain.state;
 
-class RejectedState implements BorrowingState {
+import com.vehicle.management.domain.model.BorrowingRequest;
+
+public class ReturnedState implements BorrowingState {
 
     @Override
     public void approve(BorrowingRequest r, String n) {
@@ -23,5 +25,5 @@ class RejectedState implements BorrowingState {
     }
 
     @Override
-    public String getStateName() { return "REJECTED"; }
+    public String getStateName() { return "RETURNED"; }
 }

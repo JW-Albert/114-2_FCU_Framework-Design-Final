@@ -1,7 +1,6 @@
 package com.vehicle.management.infrastructure.persistence;
 
 import com.vehicle.management.domain.model.BorrowingRequest;
-import com.vehicle.management.domain.model.InvalidStateTransitionException;
 import com.vehicle.management.infrastructure.persistence.entity.BorrowingRequestEntity;
 import com.vehicle.management.infrastructure.persistence.jpa.JpaBorrowingRepo;
 import com.vehicle.management.repository.IBorrowingRepository;

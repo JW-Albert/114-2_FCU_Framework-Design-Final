@@ -1,4 +1,4 @@
-package com.vehicle.management.domain.model;
+package com.vehicle.management.domain.state;
 
 public class InvalidStateTransitionException extends RuntimeException {
     public InvalidStateTransitionException(String currentState, String operation) {

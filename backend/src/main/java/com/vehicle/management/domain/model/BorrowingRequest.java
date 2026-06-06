@@ -1,5 +1,8 @@
 package com.vehicle.management.domain.model;
 
+import com.vehicle.management.domain.state.BorrowingState;
+import com.vehicle.management.domain.state.PendingState;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -54,13 +57,10 @@ public class BorrowingRequest {
         return state.getStateName();
     }
 
-    /** Package-private: only ConcreteState classes in this package may call this. */
-    void setState(BorrowingState newState) {
+    /** Called only by State pattern implementations to perform a transition. */
+    public void transitionState(BorrowingState newState, String note) {
         this.state = newState;
-    }
-
-    void setReviewNote(String reviewNote) {
-        this.reviewNote = reviewNote;
+        if (note != null) this.reviewNote = note;
     }
 
     public UUID getId() { return id; }

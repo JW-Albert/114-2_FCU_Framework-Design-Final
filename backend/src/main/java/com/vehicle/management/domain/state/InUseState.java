@@ -1,6 +1,8 @@
-package com.vehicle.management.domain.model;
+package com.vehicle.management.domain.state;
 
-class ApprovedState implements BorrowingState {
+import com.vehicle.management.domain.model.BorrowingRequest;
+
+public class InUseState implements BorrowingState {
 
     @Override
     public void approve(BorrowingRequest request, String reviewNote) {
@@ -14,14 +16,14 @@ class ApprovedState implements BorrowingState {
 
     @Override
     public void startUse(BorrowingRequest request) {
-        request.setState(new InUseState());
+        throw new InvalidStateTransitionException(getStateName(), "startUse");
     }
 
     @Override
     public void complete(BorrowingRequest request) {
-        throw new InvalidStateTransitionException(getStateName(), "complete");
+        request.transitionState(new ReturnedState(), null);
     }
 
     @Override
-    public String getStateName() { return "APPROVED"; }
+    public String getStateName() { return "IN_USE"; }
 }
