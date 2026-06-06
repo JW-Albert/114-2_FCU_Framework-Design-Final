@@ -1,8 +1,6 @@
-package com.vehicle.management.domain.state;
+package com.vehicle.management.domain.model;
 
-import com.vehicle.management.domain.model.BorrowingRequest;
-
-public class PendingState implements BorrowingState {
+class PendingState implements BorrowingState {
 
     @Override
     public void approve(BorrowingRequest request, String reviewNote) {

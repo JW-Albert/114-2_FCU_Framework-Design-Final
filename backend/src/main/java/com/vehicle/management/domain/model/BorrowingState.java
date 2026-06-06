@@ -1,8 +1,6 @@
-package com.vehicle.management.domain.state;
+package com.vehicle.management.domain.model;
 
-import com.vehicle.management.domain.model.BorrowingRequest;
-
-public interface BorrowingState {
+interface BorrowingState {
     void approve(BorrowingRequest request, String reviewNote);
     void reject(BorrowingRequest request, String reviewNote);
     void startUse(BorrowingRequest request);
