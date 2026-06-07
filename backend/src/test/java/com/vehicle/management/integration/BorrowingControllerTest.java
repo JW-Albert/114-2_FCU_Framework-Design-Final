@@ -8,6 +8,7 @@ import com.vehicle.management.domain.model.User;
 import com.vehicle.management.domain.role.RoleFactory;
 import com.vehicle.management.infrastructure.security.JwtAuthFilter;
 import com.vehicle.management.infrastructure.security.JwtUtil;
+import com.vehicle.management.infrastructure.security.SecurityConfig;
 import com.vehicle.management.infrastructure.security.UserDetailsServiceImpl;
 import com.vehicle.management.service.BorrowingService;
 import com.vehicle.management.service.PermissionDeniedException;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = { BorrowingController.class, GlobalExceptionHandler.class })
-@Import({ JwtAuthFilter.class, JwtUtil.class })
+@Import({ SecurityConfig.class, JwtAuthFilter.class, JwtUtil.class })
 class BorrowingControllerTest {
 
     @Autowired

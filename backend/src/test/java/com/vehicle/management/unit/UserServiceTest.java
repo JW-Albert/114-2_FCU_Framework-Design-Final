@@ -3,11 +3,15 @@ package com.vehicle.management.unit;
 import com.vehicle.management.domain.model.User;
 import com.vehicle.management.repository.inmemory.InMemoryUserRepository;
 import com.vehicle.management.service.ConflictException;
+import com.vehicle.management.service.PermissionDeniedException;
 import com.vehicle.management.service.ResourceNotFoundException;
 import com.vehicle.management.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -68,5 +72,98 @@ class UserServiceTest {
         User emp = service.register("Emp", "emp@test.com", "pwd", "EMPLOYEE");
         assertThat(emp.can(com.vehicle.management.domain.role.Permission.SUBMIT_REQUEST)).isTrue();
         assertThat(emp.can(com.vehicle.management.domain.role.Permission.APPROVE_BORROWING)).isFalse();
+    }
+
+    @Test
+    void adminRoleGrantsManageUserPermission() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        assertThat(admin.can(com.vehicle.management.domain.role.Permission.MANAGE_USER)).isTrue();
+    }
+
+    @Test
+    void employeeCannotManageUsers() {
+        User emp = service.register("Emp", "emp@test.com", "pwd", "EMPLOYEE");
+        assertThat(emp.can(com.vehicle.management.domain.role.Permission.MANAGE_USER)).isFalse();
+    }
+
+    @Test
+    void adminCanListAllUsers() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        service.register("User1", "u1@test.com", "pwd", "EMPLOYEE");
+        service.register("User2", "u2@test.com", "pwd", "EMPLOYEE");
+        List<User> users = service.listAllUsers(admin);
+        assertThat(users).hasSize(3);
+    }
+
+    @Test
+    void employeeCannotListUsers() {
+        User emp = service.register("Emp", "emp@test.com", "pwd", "EMPLOYEE");
+        assertThatThrownBy(() -> service.listAllUsers(emp))
+                .isInstanceOf(PermissionDeniedException.class);
+    }
+
+    @Test
+    void adminCanGetUserById() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        User target = service.register("Target", "target@test.com", "pwd", "EMPLOYEE");
+        User found = service.getUserById(admin, target.getId());
+        assertThat(found.getEmail()).isEqualTo("target@test.com");
+    }
+
+    @Test
+    void adminCanCreateUserByAdmin() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        User created = service.createUserByAdmin(admin, "New", "new@test.com", "pwd", "EMPLOYEE");
+        assertThat(created.getEmail()).isEqualTo("new@test.com");
+    }
+
+    @Test
+    void adminCanUpdateUser() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        User target = service.register("Old Name", "old@test.com", "pwd", "EMPLOYEE");
+        User updated = service.updateUser(admin, target.getId(), "New Name", "new@test.com");
+        assertThat(updated.getName()).isEqualTo("New Name");
+        assertThat(updated.getEmail()).isEqualTo("new@test.com");
+    }
+
+    @Test
+    void updateUserEmailConflictThrows() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        service.register("Other", "other@test.com", "pwd", "EMPLOYEE");
+        User target = service.register("Target", "target@test.com", "pwd", "EMPLOYEE");
+        assertThatThrownBy(() -> service.updateUser(admin, target.getId(), "Target", "other@test.com"))
+                .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void adminCanChangeUserRole() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        User emp = service.register("Emp", "emp@test.com", "pwd", "EMPLOYEE");
+        User updated = service.changeUserRole(admin, emp.getId(), "ADMIN");
+        assertThat(updated.can(com.vehicle.management.domain.role.Permission.MANAGE_USER)).isTrue();
+    }
+
+    @Test
+    void adminCanDeleteUser() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        User target = service.register("Target", "target@test.com", "pwd", "EMPLOYEE");
+        service.deleteUser(admin, target.getId());
+        assertThatThrownBy(() -> service.findByEmail("target@test.com"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void employeeCannotDeleteUser() {
+        User emp = service.register("Emp", "emp@test.com", "pwd", "EMPLOYEE");
+        UUID randomId = UUID.randomUUID();
+        assertThatThrownBy(() -> service.deleteUser(emp, randomId))
+                .isInstanceOf(PermissionDeniedException.class);
+    }
+
+    @Test
+    void deleteNonExistentUserThrows() {
+        User admin = service.register("Admin", "admin@test.com", "pwd", "ADMIN");
+        assertThatThrownBy(() -> service.deleteUser(admin, UUID.randomUUID()))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 }
