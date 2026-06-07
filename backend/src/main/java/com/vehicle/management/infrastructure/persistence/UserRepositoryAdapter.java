@@ -8,6 +8,7 @@ import com.vehicle.management.infrastructure.persistence.jpa.JpaUserRepo;
 import com.vehicle.management.repository.IUserRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -42,6 +43,16 @@ public class UserRepositoryAdapter implements IUserRepository {
     public User save(User user) {
         UserEntity entity = toEntity(user);
         return toDomain(jpa.save(entity));
+    }
+
+    @Override
+    public List<User> findAll() {
+        return jpa.findAll().stream().map(this::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        jpa.deleteById(id);
     }
 
     private User toDomain(UserEntity e) {

@@ -10,6 +10,8 @@ public class InMemoryUserRepository implements IUserRepository {
 
     private final Map<UUID, User> store = new ConcurrentHashMap<>();
 
+
+
     @Override
     public Optional<User> findById(UUID id) {
         return Optional.ofNullable(store.get(id));
@@ -32,5 +34,15 @@ public class InMemoryUserRepository implements IUserRepository {
     public User save(User user) {
         store.put(user.getId(), user);
         return user;
+    }
+
+    @Override
+    public List<User> findAll() {
+        return List.copyOf(store.values());
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        store.remove(id);
     }
 }

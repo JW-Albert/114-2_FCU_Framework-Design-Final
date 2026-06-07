@@ -8,6 +8,7 @@ const routes = [
   { path: '/admin/review', component: () => import('../views/AdminReviewView.vue') },
   { path: '/admin/vehicles', component: () => import('../views/AdminVehiclesView.vue') },
   { path: '/admin/maintenance', component: () => import('../views/AdminMaintenanceView.vue') },
+  { path: '/admin/users', component: () => import('../views/AdminUserManagementView.vue'), meta: { adminOnly: true } },
 ]
 
 const router = createRouter({
@@ -18,6 +19,9 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.token) {
+    return '/login'
+  }
+  if (to.meta.adminOnly && !auth.isAdmin) {
     return '/login'
   }
 })
