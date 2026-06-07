@@ -154,27 +154,94 @@
 
 ### 環境需求
 
-- Java 21+
-- Maven 3.9+
-- PostgreSQL 14+
+- Java 21+（需加入 `PATH` 或設定 `JAVA_HOME`）
 - Node.js 18+
+- PostgreSQL 14+（**僅正式模式需要**，開發模式可跳過）
+- Maven 3.9+（**可選**，本專案含 Maven Wrapper，無 Maven 亦可執行）
 
-### 後端
+---
+
+### 方式 A：開發模式（H2 記憶體資料庫，免安裝 PostgreSQL）
+
+> 適合本機快速測試，啟動後自動建立測試帳號與車輛資料。
+
+**後端（Windows PowerShell）**
+
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"
+# API 服務啟動於 http://localhost:8080
+```
+
+**後端（Mac / Linux）**
 
 ```bash
-# 1. 建立資料庫
+cd backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Dev 模式啟動後會自動建立：
+- 管理員帳號：`admin@demo.com` / `Admin1234`
+- 員工帳號：`emp@demo.com` / `Emp1234`
+- 3 輛測試車輛
+
+---
+
+### 方式 B：正式模式（PostgreSQL）
+
+**後端**
+
+```powershell
+# Windows PowerShell — 建立資料庫
 createdb vehicle_mgmt
 
-# 2. 設定環境變數（或修改 application.yml）
+# 設定環境變數
+$env:DB_USERNAME = "postgres"
+$env:DB_PASSWORD = "your_password"
+$env:JWT_SECRET  = "at-least-32-characters-long-secret"
+
+# 啟動後端（Flyway 自動執行 DB 遷移）
+cd backend
+.\mvnw.cmd spring-boot:run
+# API 服務啟動於 http://localhost:8080
+```
+
+```bash
+# Mac / Linux
+createdb vehicle_mgmt
 export DB_USERNAME=postgres
 export DB_PASSWORD=your_password
 export JWT_SECRET=at-least-32-characters-long-secret
 
-# 3. 啟動後端（Flyway 自動執行 DB 遷移）
 cd backend
-mvn spring-boot:run
-# API 服務啟動於 http://localhost:8080
+./mvnw spring-boot:run
 ```
+
+**手動建立測試帳號**
+
+```powershell
+# Windows PowerShell
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/register `
+  -ContentType "application/json" `
+  -Body '{"name":"管理員","email":"admin@company.com","password":"Admin1234","role":"ADMIN"}'
+
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/register `
+  -ContentType "application/json" `
+  -Body '{"name":"員工甲","email":"emp@company.com","password":"Emp1234","role":"EMPLOYEE"}'
+```
+
+```bash
+# Mac / Linux（curl）
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"管理員","email":"admin@company.com","password":"Admin1234","role":"ADMIN"}'
+
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"員工甲","email":"emp@company.com","password":"Emp1234","role":"EMPLOYEE"}'
+```
+
+---
 
 ### 前端
 
@@ -183,20 +250,6 @@ cd frontend
 npm install
 npm run dev
 # 前端啟動於 http://localhost:5173
-```
-
-### 預設測試帳號（需自行透過 API 建立）
-
-```bash
-# 建立管理員帳號
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"管理員","email":"admin@company.com","password":"Admin1234","role":"ADMIN"}'
-
-# 建立員工帳號
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"員工甲","email":"emp@company.com","password":"Emp1234","role":"EMPLOYEE"}'
 ```
 
 ---
@@ -253,9 +306,16 @@ curl -X POST http://localhost:8080/api/auth/register \
 
 使用 InMemory Repository 實作，不依賴資料庫，執行速度為毫秒級：
 
-```bash
+```powershell
+# Windows PowerShell
 cd backend
-mvn test -pl . -Dtest="*ServiceTest"
+.\mvnw.cmd test "-Dtest=*ServiceTest"
+```
+
+```bash
+# Mac / Linux
+cd backend
+./mvnw test -Dtest="*ServiceTest"
 ```
 
 | 測試類別 | 測試案例 |
@@ -269,9 +329,14 @@ mvn test -pl . -Dtest="*ServiceTest"
 
 使用 `@WebMvcTest` + `@MockBean` 測試 REST 控制器的完整 HTTP 處理鏈：
 
+```powershell
+# Windows PowerShell
+.\mvnw.cmd test "-Dtest=BorrowingControllerTest"
+```
+
 ```bash
-cd backend
-mvn test -Dtest="BorrowingControllerTest"
+# Mac / Linux
+./mvnw test -Dtest="BorrowingControllerTest"
 ```
 
 測試內容涵蓋：HTTP 狀態碼、JSON 序列化、JWT 認證守衛、权限拒絕（403）、未認證請求（401）。
