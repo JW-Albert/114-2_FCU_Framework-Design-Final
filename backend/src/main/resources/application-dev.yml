@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:vehicle_mgmt;MODE=PostgreSQL;DATABASE_TO_UPPER=false;NON_KEYWORDS=VALUE,YEAR
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+app:
+  jwt:
+    secret: dev-secret-key-for-local-testing-only-32c
+    expiration-ms: 3600000
+
+server:
+  port: 8080
