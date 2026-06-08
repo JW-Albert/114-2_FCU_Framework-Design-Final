@@ -15,18 +15,34 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * SRP: 只負責借車申請工作流程。
- * Observer（Ch20）: 繼承 BorrowingEventPublisher，狀態改變時廣播通知。
- * Strategy（Ch18）: 注入 ConflictCheckStrategy，衝突檢查演算法可替換。
- * 迪米特法則: 呼叫 request.approve() 委派給 State Pattern，不直接操作狀態字串。
+ * 借車申請業務邏輯服務。
+ *
+ * <p><b>套用的設計原則與設計模式：</b>
+ * <ul>
+ *   <li><b>SRP</b>：只負責借車申請的生命週期管理（送出、審核、出車、還車）。</li>
+ *   <li><b>Observer Pattern（Ch20）</b>：繼承 {@link BorrowingEventPublisher}，
+ *       狀態改變後廣播通知，無需直接呼叫通知類別（DIP）。</li>
+ *   <li><b>Strategy Pattern（Ch18）</b>：注入 {@link ConflictCheckStrategy}，
+ *       衝突判斷演算法可在不修改此類別的情況下替換（OCP）。</li>
+ *   <li><b>State Pattern（Ch13）</b>：透過 {@link BorrowingRequest#approve} 等方法委派給
+ *       狀態物件，遵守迪米特法則（LoD），不直接操作狀態字串。</li>
+ *   <li><b>DIP</b>：依賴 {@link IBorrowingRepository} 與 {@link IVehicleRepository} 介面。</li>
+ * </ul>
  */
 @Service
 public class BorrowingService extends BorrowingEventPublisher {
 
     private final IBorrowingRepository borrowingRepo;
     private final IVehicleRepository vehicleRepo;
+    /** 衝突檢查策略，預設使用嚴格時段重疊判斷。 */
     private final ConflictCheckStrategy conflictStrategy;
 
+    /**
+     * 建構借車服務，注入所需儲存庫，並使用預設的嚴格衝突策略。
+     *
+     * @param borrowingRepo 借車申請儲存庫
+     * @param vehicleRepo   車輛儲存庫
+     */
     public BorrowingService(IBorrowingRepository borrowingRepo,
                             IVehicleRepository vehicleRepo) {
         this.borrowingRepo = borrowingRepo;
@@ -34,14 +50,37 @@ public class BorrowingService extends BorrowingEventPublisher {
         this.conflictStrategy = new StrictOverlapStrategy();
     }
 
+    /**
+     * 送出借車申請。
+     *
+     * <p>執行流程：
+     * <ol>
+     *   <li>驗證申請人擁有 {@link Permission#SUBMIT_REQUEST} 權限</li>
+     *   <li>確認車輛存在</li>
+     *   <li>以 {@link ConflictCheckStrategy} 檢查時段是否衝突</li>
+     *   <li>建立狀態為 PENDING 的新申請並儲存</li>
+     * </ol>
+     *
+     * @param actor     送出申請的使用者
+     * @param vehicleId 欲借用的車輛 ID
+     * @param start     借車開始時間
+     * @param end       借車結束時間
+     * @param purpose   借車事由
+     * @return 已儲存的借車申請（狀態為 PENDING）
+     * @throws PermissionDeniedException  若使用者不具備送出申請的權限
+     * @throws ResourceNotFoundException  若車輛 ID 不存在
+     * @throws ConflictException          若時段與現有申請衝突
+     */
     public BorrowingRequest submitRequest(User actor, UUID vehicleId,
                                           Instant start, Instant end, String purpose) {
         if (!actor.can(Permission.SUBMIT_REQUEST)) {
             throw new PermissionDeniedException(actor.getEmail() + " cannot submit requests");
         }
+        // 確認車輛存在
         vehicleRepo.findById(vehicleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
 
+        // Strategy Pattern：衝突檢查演算法可替換
         List<BorrowingRequest> conflicts = borrowingRepo.findConflicting(vehicleId, start, end);
         if (conflictStrategy.hasConflict(conflicts, start, end)) {
             throw new ConflictException("Vehicle is already booked for this period");
@@ -52,64 +91,125 @@ public class BorrowingService extends BorrowingEventPublisher {
         return borrowingRepo.save(request);
     }
 
+    /**
+     * 審核通過借車申請（PENDING → APPROVED）。
+     *
+     * @param actor     執行審核的管理員
+     * @param requestId 申請單 ID
+     * @param note      審核備註
+     * @return 已更新的借車申請（狀態為 APPROVED）
+     * @throws PermissionDeniedException             若使用者不具備審核權限
+     * @throws ResourceNotFoundException             若申請單 ID 不存在
+     * @throws com.vehicle.management.domain.state.InvalidStateTransitionException
+     *         若申請目前狀態不允許核准
+     */
     public BorrowingRequest approveRequest(User actor, UUID requestId, String note) {
         if (!actor.can(Permission.APPROVE_BORROWING)) {
             throw new PermissionDeniedException(actor.getEmail() + " cannot approve requests");
         }
         BorrowingRequest request = getRequest(requestId);
-        request.approve(note);
+        request.approve(note);  // State Pattern：委派給 PendingState
         BorrowingRequest saved = borrowingRepo.save(request);
-        notifyApproved(saved);
+        notifyApproved(saved);  // Observer Pattern：廣播核准事件
         return saved;
     }
 
+    /**
+     * 拒絕借車申請（PENDING → REJECTED）。
+     *
+     * @param actor     執行審核的管理員
+     * @param requestId 申請單 ID
+     * @param note      拒絕原因
+     * @return 已更新的借車申請（狀態為 REJECTED）
+     * @throws PermissionDeniedException 若使用者不具備審核權限
+     * @throws ResourceNotFoundException 若申請單 ID 不存在
+     */
     public BorrowingRequest rejectRequest(User actor, UUID requestId, String note) {
         if (!actor.can(Permission.APPROVE_BORROWING)) {
             throw new PermissionDeniedException(actor.getEmail() + " cannot reject requests");
         }
         BorrowingRequest request = getRequest(requestId);
-        request.reject(note);
+        request.reject(note);  // State Pattern：委派給 PendingState
         BorrowingRequest saved = borrowingRepo.save(request);
-        notifyRejected(saved);
+        notifyRejected(saved);  // Observer Pattern：廣播拒絕事件
         return saved;
     }
 
+    /**
+     * 執行出車（APPROVED → IN_USE），同步更新車輛狀態為 IN_USE。
+     *
+     * @param requestId 申請單 ID
+     * @return 已更新的借車申請（狀態為 IN_USE）
+     * @throws ResourceNotFoundException 若申請單 ID 不存在
+     */
     public BorrowingRequest startUse(UUID requestId) {
         BorrowingRequest request = getRequest(requestId);
+        // 同步更新車輛狀態為使用中
         vehicleRepo.findById(request.getVehicleId()).ifPresent(v -> {
             v.markInUse();
             vehicleRepo.save(v);
         });
-        request.startUse();
+        request.startUse();  // State Pattern：委派給 ApprovedState
         BorrowingRequest saved = borrowingRepo.save(request);
-        notifyStarted(saved);
+        notifyStarted(saved);  // Observer Pattern：廣播出車事件
         return saved;
     }
 
+    /**
+     * 執行還車（IN_USE → RETURNED），同步更新車輛狀態為 AVAILABLE。
+     *
+     * @param requestId 申請單 ID
+     * @return 已更新的借車申請（狀態為 RETURNED）
+     * @throws ResourceNotFoundException 若申請單 ID 不存在
+     */
     public BorrowingRequest completeUse(UUID requestId) {
         BorrowingRequest request = getRequest(requestId);
+        // 同步更新車輛狀態為可用
         vehicleRepo.findById(request.getVehicleId()).ifPresent(v -> {
             v.markAvailable();
             vehicleRepo.save(v);
         });
-        request.complete();
+        request.complete();  // State Pattern：委派給 InUseState
         BorrowingRequest saved = borrowingRepo.save(request);
-        notifyCompleted(saved);
+        notifyCompleted(saved);  // Observer Pattern：廣播還車事件
         return saved;
     }
 
+    /**
+     * 取得所有待審核申請。
+     *
+     * @return 狀態為 PENDING 的申請清單
+     */
     public List<BorrowingRequest> listPending() {
         return borrowingRepo.findPending();
     }
 
+    /**
+     * 取得指定使用者的所有申請紀錄。
+     *
+     * @param userId 使用者唯一識別碼
+     * @return 該使用者的申請清單
+     */
     public List<BorrowingRequest> listMyRequests(UUID userId) {
         return borrowingRepo.findByUserId(userId);
     }
 
+    /**
+     * 取得系統所有借車申請（管理員用）。
+     *
+     * @return 全部借車申請清單
+     */
     public List<BorrowingRequest> listAll() {
         return borrowingRepo.findAll();
     }
 
+    /**
+     * 依 ID 取得借車申請，若不存在則拋出例外。
+     *
+     * @param id 申請單 ID
+     * @return 借車申請物件
+     * @throws ResourceNotFoundException 若申請單不存在
+     */
     private BorrowingRequest getRequest(UUID id) {
         return borrowingRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found: " + id));
