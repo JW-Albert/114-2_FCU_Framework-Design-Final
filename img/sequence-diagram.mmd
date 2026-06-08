@@ -1,0 +1,41 @@
+sequenceDiagram
+    actor Employee as Employee
+    actor Admin as Admin
+    participant BC as BorrowingController
+    participant BS as BorrowingService
+    participant CCS as ConflictCheckStrategy
+    participant Repo as IBorrowingRepository
+    participant VP as BorrowingEventPublisher
+    participant EO as EmailNotificationObserver
+
+    Employee->>BC: POST /api/borrowings
+    BC->>BS: submitRequest(user, vehicleId, start, end, purpose)
+    BS->>Repo: findConflicting(vehicleId, start, end)
+    Repo-->>BS: [] (no conflict)
+    BS->>CCS: hasConflict(existing, start, end)
+    CCS-->>BS: false
+    BS->>Repo: save(BorrowingRequest PENDING)
+    Repo-->>BS: savedRequest
+    BS-->>BC: BorrowingRequest PENDING
+    BC-->>Employee: 201 Created
+
+    Admin->>BC: POST /api/borrowings/{id}/approve
+    BC->>BS: approveRequest(admin, id, note)
+    BS->>Repo: findById(id)
+    Repo-->>BS: BorrowingRequest PENDING
+    note over BS: State Pattern: delegate to PendingState
+    BS->>BS: request.approve(note)
+    BS->>Repo: save(request APPROVED)
+    BS->>VP: notifyApproved(request)
+    VP->>EO: onApproved(request)
+    EO-->>VP: [Email output]
+    BS-->>BC: BorrowingRequest APPROVED
+    BC-->>Admin: 200 OK
+
+    Admin->>BC: POST /api/borrowings/{id}/start
+    BC->>BS: startUse(id)
+    BS->>BS: vehicle.markInUse()
+    note over BS: State Pattern: delegate to ApprovedState
+    BS->>BS: request.startUse()
+    BS-->>BC: BorrowingRequest IN_USE
+    BC-->>Admin: 200 OK

@@ -1,0 +1,19 @@
+stateDiagram-v2
+    [*] --> PENDING : 員工送出申請 submitRequest()
+
+    PENDING --> APPROVED : approve() 管理員核准
+    PENDING --> REJECTED : reject() 管理員拒絕
+
+    APPROVED --> IN_USE : startUse() 管理員出車
+
+    IN_USE --> RETURNED : complete() 管理員還車
+
+    REJECTED --> [*]
+    RETURNED --> [*]
+
+    note right of PENDING
+        非法轉換（例如對 RETURNED
+        再次 approve）將拋出
+        InvalidStateTransitionException
+        → HTTP 422
+    end note
