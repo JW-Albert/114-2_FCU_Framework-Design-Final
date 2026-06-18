@@ -1,11 +1,12 @@
 package com.vehicle.management.service;
 
+import com.vehicle.management.domain.chain.BorrowingValidationContext;
+import com.vehicle.management.domain.chain.BorrowingValidator;
 import com.vehicle.management.domain.model.BorrowingRequest;
 import com.vehicle.management.domain.model.User;
+import com.vehicle.management.domain.observer.BorrowingEventObserver;
 import com.vehicle.management.domain.observer.BorrowingEventPublisher;
 import com.vehicle.management.domain.role.Permission;
-import com.vehicle.management.domain.observer.BorrowingEventObserver;
-import com.vehicle.management.domain.strategy.ConflictCheckStrategy;
 import com.vehicle.management.repository.IBorrowingRepository;
 import com.vehicle.management.repository.IUserRepository;
 import com.vehicle.management.repository.IVehicleRepository;
@@ -37,48 +38,46 @@ public class BorrowingService extends BorrowingEventPublisher {
     private final IBorrowingRepository borrowingRepo;
     private final IVehicleRepository vehicleRepo;
     private final IUserRepository userRepo;
-    /** 衝突檢查策略，預設使用嚴格時段重疊判斷。 */
-    private final ConflictCheckStrategy conflictStrategy;
     /** 違規記錄服務，於還車時偵測超時並建立違規記錄。 */
     private final ViolationService violationService;
+    /** Chain of Responsibility：依序執行借車申請的各項驗證節點。 */
+    private final List<BorrowingValidator> validators;
 
     /**
      * 建構借車服務。
      *
-     * <p>Spring 會自動注入所有實作 {@link BorrowingEventObserver} 的 Bean（Observer Pattern），
-     * 以及由 {@code AppConfig} 宣告的 {@link ConflictCheckStrategy} Bean（Strategy Pattern）。</p>
+     * <p>Spring 自動注入所有實作 {@link BorrowingEventObserver} 的 Bean（Observer Pattern），
+     * 以及所有 {@link BorrowingValidator} Bean（Chain of Responsibility Pattern）。</p>
      *
      * @param borrowingRepo    借車申請儲存庫
      * @param vehicleRepo      車輛儲存庫
      * @param userRepo         使用者儲存庫（用於 MANAGER 部門驗證）
      * @param violationService 違規記錄服務（@Lazy 避免循環依賴）
-     * @param conflictStrategy 衝突檢查策略，由 Spring 注入（預設 StrictOverlapStrategy）
      * @param observers        所有已註冊的事件觀察者，由 Spring 自動收集
+     * @param validators       借車申請驗證責任鏈節點，由 Spring 依 @Order 排序後注入
      */
     public BorrowingService(IBorrowingRepository borrowingRepo,
                             IVehicleRepository vehicleRepo,
                             IUserRepository userRepo,
                             @Lazy ViolationService violationService,
-                            ConflictCheckStrategy conflictStrategy,
-                            List<BorrowingEventObserver> observers) {
+                            List<BorrowingEventObserver> observers,
+                            List<BorrowingValidator> validators) {
         this.borrowingRepo = borrowingRepo;
         this.vehicleRepo = vehicleRepo;
         this.userRepo = userRepo;
-        this.conflictStrategy = conflictStrategy;
         this.violationService = violationService;
+        this.validators = validators;
         observers.forEach(this::addObserver);
     }
 
     /**
      * 送出借車申請。
      *
-     * <p>執行流程：
-     * <ol>
-     *   <li>驗證申請人擁有 {@link Permission#SUBMIT_REQUEST} 權限</li>
-     *   <li>確認車輛存在</li>
-     *   <li>以 {@link ConflictCheckStrategy} 檢查時段是否衝突</li>
-     *   <li>建立狀態為 PENDING 的新申請並儲存</li>
-     * </ol>
+     * <p>Chain of Responsibility Pattern：將驗證邏輯委派給責任鏈
+     * （{@link com.vehicle.management.domain.chain.PermissionValidator} →
+     * {@link com.vehicle.management.domain.chain.VehicleExistenceValidator} →
+     * {@link com.vehicle.management.domain.chain.TimeConflictValidator}），
+     * 任一節點驗證失敗即丟出例外，本方法只負責最終建立並儲存申請。</p>
      *
      * @param actor     送出申請的使用者
      * @param vehicleId 欲借用的車輛 ID
@@ -86,24 +85,11 @@ public class BorrowingService extends BorrowingEventPublisher {
      * @param end       借車結束時間
      * @param purpose   借車事由
      * @return 已儲存的借車申請（狀態為 PENDING）
-     * @throws PermissionDeniedException  若使用者不具備送出申請的權限
-     * @throws ResourceNotFoundException  若車輛 ID 不存在
-     * @throws ConflictException          若時段與現有申請衝突
      */
     public BorrowingRequest submitRequest(User actor, UUID vehicleId,
                                           Instant start, Instant end, String purpose) {
-        if (!actor.can(Permission.SUBMIT_REQUEST)) {
-            throw new PermissionDeniedException(actor.getEmail() + " cannot submit requests");
-        }
-        // 確認車輛存在
-        vehicleRepo.findById(vehicleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
-
-        // Strategy Pattern：衝突檢查演算法可替換
-        List<BorrowingRequest> conflicts = borrowingRepo.findConflicting(vehicleId, start, end);
-        if (conflictStrategy.hasConflict(conflicts, start, end)) {
-            throw new ConflictException("Vehicle is already booked for this period");
-        }
+        BorrowingValidationContext ctx = new BorrowingValidationContext(actor, vehicleId, start, end);
+        validators.forEach(v -> v.validate(ctx));
 
         BorrowingRequest request = new BorrowingRequest(
                 UUID.randomUUID(), actor.getId(), vehicleId, start, end, purpose, Instant.now());

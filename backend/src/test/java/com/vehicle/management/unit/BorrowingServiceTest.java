@@ -1,5 +1,8 @@
 package com.vehicle.management.unit;
 
+import com.vehicle.management.domain.chain.PermissionValidator;
+import com.vehicle.management.domain.chain.TimeConflictValidator;
+import com.vehicle.management.domain.chain.VehicleExistenceValidator;
 import com.vehicle.management.domain.model.BorrowingRequest;
 import com.vehicle.management.domain.model.User;
 import com.vehicle.management.domain.model.Vehicle;
@@ -35,8 +38,13 @@ class BorrowingServiceTest {
         vehicleRepo = new InMemoryVehicleRepository();
         InMemoryBorrowingRepository borrowingRepo = new InMemoryBorrowingRepository();
         InMemoryUserRepository userRepo = new InMemoryUserRepository();
+        StrictOverlapStrategy strategy = new StrictOverlapStrategy();
         service = new BorrowingService(borrowingRepo, vehicleRepo, userRepo, null,
-                new StrictOverlapStrategy(), java.util.List.of());
+                java.util.List.of(),
+                java.util.List.of(
+                        new PermissionValidator(),
+                        new VehicleExistenceValidator(vehicleRepo),
+                        new TimeConflictValidator(borrowingRepo, strategy)));
 
         employee = new User(UUID.randomUUID(), "Alice", "alice@example.com",
                 "hash", Set.of(RoleFactory.create("EMPLOYEE")), Instant.now());

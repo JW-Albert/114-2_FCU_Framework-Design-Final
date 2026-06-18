@@ -56,21 +56,17 @@ public class BorrowingRepositoryAdapter implements IBorrowingRepository {
         return toDomain(jpa.save(toEntity(request)));
     }
 
+    /** Builder Pattern（GoF Ch3）：直接還原狀態，不重播轉換副作用。 */
     private BorrowingRequest toDomain(BorrowingRequestEntity e) {
-        BorrowingRequest r = new BorrowingRequest(
-                e.getId(), e.getUserId(), e.getVehicleId(),
-                e.getPeriodStart(), e.getPeriodEnd(), e.getPurpose(), e.getCreatedAt());
-        // Restore state by replaying transitions
-        int endMil = e.getEndMileage() != null ? e.getEndMileage() : 0;
-        switch (e.getState()) {
-            case "APPROVED" -> r.approve(e.getReviewNote());
-            case "REJECTED" -> r.reject(e.getReviewNote());
-            case "IN_USE"   -> { r.approve(null); r.startUse(); }
-            case "RETURNED" -> { r.approve(null); r.startUse(); r.complete(endMil); }
-            // PENDING: no replay needed
-        }
-        r.restoreMileage(e.getStartMileage(), e.getEndMileage());
-        return r;
+        return BorrowingRequest.builder(
+                        e.getId(), e.getUserId(), e.getVehicleId(),
+                        e.getPeriodStart(), e.getPeriodEnd(), e.getPurpose(), e.getCreatedAt())
+                .restoreState(e.getState())
+                .reviewNote(e.getReviewNote())
+                .updatedAt(e.getUpdatedAt())
+                .startMileage(e.getStartMileage())
+                .endMileage(e.getEndMileage())
+                .build();
     }
 
     private BorrowingRequestEntity toEntity(BorrowingRequest r) {

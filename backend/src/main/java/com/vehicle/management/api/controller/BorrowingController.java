@@ -5,8 +5,13 @@ import com.vehicle.management.api.dto.CompleteBorrowingRequest;
 import com.vehicle.management.api.dto.ConflictCheckResponse;
 import com.vehicle.management.api.dto.ReviewBorrowingRequest;
 import com.vehicle.management.api.dto.SubmitBorrowingRequest;
+import com.vehicle.management.domain.command.ApproveCommand;
+import com.vehicle.management.domain.command.CompleteCommand;
+import com.vehicle.management.domain.command.RejectCommand;
+import com.vehicle.management.domain.command.StartUseCommand;
 import com.vehicle.management.domain.model.BorrowingRequest;
 import com.vehicle.management.domain.model.User;
+import com.vehicle.management.service.BorrowingCommandBus;
 import com.vehicle.management.service.BorrowingService;
 import com.vehicle.management.service.UserService;
 import jakarta.validation.Valid;
@@ -27,10 +32,14 @@ import java.util.UUID;
 public class BorrowingController {
 
     private final BorrowingService borrowingService;
+    private final BorrowingCommandBus commandBus;
     private final UserService userService;
 
-    public BorrowingController(BorrowingService borrowingService, UserService userService) {
+    public BorrowingController(BorrowingService borrowingService,
+                               BorrowingCommandBus commandBus,
+                               UserService userService) {
         this.borrowingService = borrowingService;
+        this.commandBus = commandBus;
         this.userService = userService;
     }
 
@@ -82,7 +91,7 @@ public class BorrowingController {
                                       @RequestBody(required = false) ReviewBorrowingRequest req) {
         User actor = userService.findByEmail(principal.getUsername());
         String note = req != null ? req.note() : null;
-        return BorrowingResponse.from(borrowingService.approveRequest(actor, id, note));
+        return BorrowingResponse.from(commandBus.dispatch(new ApproveCommand(borrowingService, actor, id, note)));
     }
 
     @PostMapping("/{id}/reject")
@@ -91,18 +100,18 @@ public class BorrowingController {
                                      @RequestBody(required = false) ReviewBorrowingRequest req) {
         User actor = userService.findByEmail(principal.getUsername());
         String note = req != null ? req.note() : null;
-        return BorrowingResponse.from(borrowingService.rejectRequest(actor, id, note));
+        return BorrowingResponse.from(commandBus.dispatch(new RejectCommand(borrowingService, actor, id, note)));
     }
 
     @PostMapping("/{id}/start")
     public BorrowingResponse startUse(@PathVariable UUID id) {
-        return BorrowingResponse.from(borrowingService.startUse(id));
+        return BorrowingResponse.from(commandBus.dispatch(new StartUseCommand(borrowingService, id)));
     }
 
     @PostMapping("/{id}/complete")
     public BorrowingResponse complete(@PathVariable UUID id,
                                        @Valid @RequestBody CompleteBorrowingRequest req) {
-        return BorrowingResponse.from(borrowingService.completeUse(id, req.endMileage()));
+        return BorrowingResponse.from(commandBus.dispatch(new CompleteCommand(borrowingService, id, req.endMileage())));
     }
 
     @GetMapping("/conflict-check")

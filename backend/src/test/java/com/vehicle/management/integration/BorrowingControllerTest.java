@@ -10,6 +10,7 @@ import com.vehicle.management.infrastructure.security.JwtAuthFilter;
 import com.vehicle.management.infrastructure.security.JwtUtil;
 import com.vehicle.management.infrastructure.security.SecurityConfig;
 import com.vehicle.management.infrastructure.security.UserDetailsServiceImpl;
+import com.vehicle.management.service.BorrowingCommandBus;
 import com.vehicle.management.service.BorrowingService;
 import com.vehicle.management.service.PermissionDeniedException;
 import com.vehicle.management.service.UserService;
@@ -47,6 +48,9 @@ class BorrowingControllerTest {
 
     @MockBean
     private BorrowingService borrowingService;
+
+    @MockBean
+    private BorrowingCommandBus commandBus;
 
     @MockBean
     private UserService userService;
@@ -109,7 +113,7 @@ class BorrowingControllerTest {
     void approveRequest_returnsOk() throws Exception {
         when(userService.findByEmail("bob@test.com")).thenReturn(admin);
         sampleRequest.approve("Approved");
-        when(borrowingService.approveRequest(any(), any(), any())).thenReturn(sampleRequest);
+        when(commandBus.dispatch(any())).thenReturn(sampleRequest);
 
         mockMvc.perform(post("/api/borrowings/" + sampleRequest.getId() + "/approve")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -122,7 +126,7 @@ class BorrowingControllerTest {
     @WithMockUser(username = "alice@test.com")
     void approveRequest_forbiddenForEmployee() throws Exception {
         when(userService.findByEmail("alice@test.com")).thenReturn(employee);
-        when(borrowingService.approveRequest(any(), any(), any()))
+        when(commandBus.dispatch(any()))
                 .thenThrow(new PermissionDeniedException("not allowed"));
 
         mockMvc.perform(post("/api/borrowings/" + sampleRequest.getId() + "/approve")
