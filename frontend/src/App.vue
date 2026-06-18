@@ -12,14 +12,19 @@
           <router-link to="/admin/violations">違規記錄</router-link>
           <router-link to="/admin/calendar">借用日曆</router-link>
         </template>
+        <template v-else-if="auth.isManager">
+          <router-link to="/employee/borrow">借車申請</router-link>
+          <router-link to="/admin/review">借車申請審核</router-link>
+          <router-link to="/admin/calendar">借用日曆</router-link>
+        </template>
         <template v-else>
           <router-link to="/employee/borrow">借車申請</router-link>
         </template>
       </div>
       <div class="nav-right">
         <span class="user-name">{{ auth.userName }}</span>
-        <span class="role-badge" :class="auth.isAdmin ? 'admin' : 'employee'">
-          {{ auth.isAdmin ? '管理員' : '員工' }}
+        <span class="role-badge" :class="auth.isAdmin ? 'admin' : auth.isManager ? 'manager' : 'employee'">
+          {{ auth.isAdmin ? '管理員' : auth.isManager ? '主管' : '員工' }}
         </span>
         <button class="logout-btn" @click="handleLogout">登出</button>
       </div>
@@ -122,6 +127,11 @@ body {
 
 .role-badge.admin {
   background: #3b82f6;
+  color: white;
+}
+
+.role-badge.manager {
+  background: #8b5cf6;
   color: white;
 }
 
