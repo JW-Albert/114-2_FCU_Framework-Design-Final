@@ -224,6 +224,18 @@ public class BorrowingService extends BorrowingEventPublisher {
     }
 
     /**
+     * 查詢指定車輛與時段是否有衝突申請。
+     *
+     * @param vehicleId 車輛唯一識別碼
+     * @param start     借車開始時間
+     * @param end       借車結束時間
+     * @return 衝突的借車申請清單（空清單表示無衝突）
+     */
+    public List<BorrowingRequest> findConflicts(UUID vehicleId, Instant start, Instant end) {
+        return borrowingRepo.findConflicting(vehicleId, start, end);
+    }
+
+    /**
      * 依 ID 取得借車申請，若不存在則拋出例外。
      *
      * @param id 申請單 ID

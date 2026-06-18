@@ -42,8 +42,53 @@
         <label>用途說明</label>
         <textarea v-model="purpose" rows="3" placeholder="請填寫借車目的…"></textarea>
       </div>
+
+      <!-- 衝突檢查結果 -->
+      <div v-if="checkingConflict" class="conflict-checking">
+        正在檢查時段衝突…
+      </div>
+      <div v-else-if="conflictResult !== null && searchStart && searchEnd">
+        <!-- 有衝突 -->
+        <div v-if="conflictResult.hasConflict" class="conflict-warning">
+          <div class="conflict-warning-title">⚠️ 此時段已有借用衝突</div>
+          <ul class="conflict-list">
+            <li v-for="c in conflictResult.conflicts" :key="c.id">
+              {{ fmt(c.periodStart) }} ～ {{ fmt(c.periodEnd) }}
+              <span class="conflict-state">（{{ stateLabel(c.state) }}）</span>
+            </li>
+          </ul>
+          <div v-if="alternativeVehicles.length > 0" class="alternatives">
+            <div class="alternatives-title">其他可用車輛</div>
+            <div class="vehicle-list">
+              <div
+                v-for="v in alternativeVehicles"
+                :key="v.id"
+                class="vehicle-card"
+                :class="{ selected: selectedVehicleId === v.id }"
+                @click="selectedVehicleId = v.id"
+              >
+                <strong>{{ v.plate }}</strong>
+                <span>{{ v.model }} ({{ v.year }})</span>
+                <span class="status-available">可用</span>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="alternativeVehicles.length === 0 && searchStart && searchEnd" class="empty">
+            此時段無其他可用車輛
+          </div>
+        </div>
+        <!-- 無衝突 -->
+        <div v-else class="conflict-ok">
+          ✓ 此時段可借用
+        </div>
+      </div>
+
       <p v-if="submitError" class="error">{{ submitError }}</p>
-      <button class="btn primary" @click="submitRequest" :disabled="submitting">
+      <button
+        class="btn primary"
+        @click="submitRequest"
+        :disabled="submitting || (conflictResult !== null && conflictResult.hasConflict)"
+      >
         {{ submitting ? '送出中…' : '送出申請' }}
       </button>
     </section>
@@ -83,9 +128,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { vehiclesApi, type Vehicle } from '../api/vehicles'
-import { borrowingsApi, type BorrowingRequest } from '../api/borrowings'
+import { borrowingsApi, type BorrowingRequest, type ConflictCheckResult } from '../api/borrowings'
 
 const searchStart = ref('')
 const searchEnd = ref('')
@@ -98,6 +143,50 @@ const submitting = ref(false)
 const submitError = ref('')
 const myRequests = ref<BorrowingRequest[]>([])
 const vehicleMap = ref<Record<string, string>>({})
+
+// Conflict check state
+const conflictResult = ref<ConflictCheckResult | null>(null)
+const checkingConflict = ref(false)
+const alternativeVehicles = ref<Vehicle[]>([])
+
+let conflictDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+// Watch for vehicle selection + date changes to trigger conflict check
+watch(
+  [selectedVehicleId, searchStart, searchEnd],
+  ([vehicleId, start, end]) => {
+    conflictResult.value = null
+    alternativeVehicles.value = []
+
+    if (!vehicleId || !start || !end) return
+
+    if (conflictDebounceTimer) clearTimeout(conflictDebounceTimer)
+    conflictDebounceTimer = setTimeout(async () => {
+      checkingConflict.value = true
+      try {
+        const startIso = new Date(start).toISOString()
+        const endIso = new Date(end).toISOString()
+        const result = await borrowingsApi.checkConflict(vehicleId, startIso, endIso)
+        conflictResult.value = result
+
+        // If there's a conflict, fetch alternative available vehicles
+        if (result.hasConflict) {
+          try {
+            const { data } = await vehiclesApi.findAvailable(startIso, endIso)
+            // Exclude the currently selected vehicle from alternatives
+            alternativeVehicles.value = data.filter(v => v.id !== vehicleId)
+          } catch {
+            alternativeVehicles.value = []
+          }
+        }
+      } catch {
+        conflictResult.value = null
+      } finally {
+        checkingConflict.value = false
+      }
+    }, 300)
+  }
+)
 
 onMounted(async () => {
   await loadMyRequests()
@@ -115,6 +204,8 @@ async function searchVehicles() {
   if (!searchStart.value || !searchEnd.value) return
   searching.value = true
   searched.value = false
+  conflictResult.value = null
+  alternativeVehicles.value = []
   try {
     const start = new Date(searchStart.value).toISOString()
     const end = new Date(searchEnd.value).toISOString()
@@ -144,6 +235,8 @@ async function submitRequest() {
     selectedVehicleId.value = null
     availableVehicles.value = []
     searched.value = false
+    conflictResult.value = null
+    alternativeVehicles.value = []
     await loadMyRequests()
   } catch (e: any) {
     submitError.value = e.response?.data?.error ?? '送出失敗'
@@ -216,4 +309,30 @@ input:focus, textarea:focus { outline: none; border-color: #3b82f6; }
 .empty { color: #94a3b8; font-size: 0.9rem; padding: 1rem 0; }
 .error { color: #ef4444; font-size: 0.85rem; margin-bottom: 0.5rem; }
 textarea { width: 100%; resize: vertical; }
+
+/* Conflict check styles */
+.conflict-checking { color: #64748b; font-size: 0.88rem; margin-bottom: 0.75rem; }
+.conflict-warning {
+  background: #fffbeb;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.conflict-warning-title { font-weight: 700; color: #92400e; margin-bottom: 0.5rem; }
+.conflict-list { margin: 0 0 0.75rem 1.2rem; padding: 0; color: #78350f; font-size: 0.88rem; }
+.conflict-list li { margin-bottom: 0.25rem; }
+.conflict-state { color: #a16207; font-size: 0.8rem; }
+.alternatives { margin-top: 0.75rem; }
+.alternatives-title { font-weight: 600; font-size: 0.88rem; color: #334155; margin-bottom: 0.25rem; }
+.conflict-ok {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  color: #15803d;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
 </style>
