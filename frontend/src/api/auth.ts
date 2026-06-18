@@ -5,6 +5,7 @@ export interface AuthResponse {
   email: string
   name: string
   roles: string[]
+  department?: string
 }
 
 export const authApi = {

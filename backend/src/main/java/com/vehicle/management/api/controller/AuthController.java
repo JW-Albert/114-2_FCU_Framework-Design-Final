@@ -30,7 +30,7 @@ public class AuthController {
         User user = userService.register(req.name(), req.email(), req.password(), req.role());
         String token = jwtUtil.generate(user.getEmail());
         List<String> roles = user.getRoles().stream().map(r -> r.getName().toLowerCase()).toList();
-        return new AuthResponse(token, user.getEmail(), user.getName(), roles);
+        return new AuthResponse(token, user.getEmail(), user.getName(), roles, user.getDepartment());
     }
 
     @PostMapping("/login")
@@ -41,6 +41,6 @@ public class AuthController {
         }
         String token = jwtUtil.generate(user.getEmail());
         List<String> roles = user.getRoles().stream().map(r -> r.getName().toLowerCase()).toList();
-        return new AuthResponse(token, user.getEmail(), user.getName(), roles);
+        return new AuthResponse(token, user.getEmail(), user.getName(), roles, user.getDepartment());
     }
 }

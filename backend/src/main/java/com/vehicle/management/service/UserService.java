@@ -139,8 +139,30 @@ public class UserService {
      */
     public User createUserByAdmin(User caller, String name, String email,
                                   String rawPassword, String roleName) {
+        return createUserByAdmin(caller, name, email, rawPassword, roleName, null);
+    }
+
+    /**
+     * 管理員建立新使用者帳號（可指定角色與部門）。
+     *
+     * @param caller      執行此操作的管理員
+     * @param name        新帳號名稱
+     * @param email       新帳號 Email
+     * @param rawPassword 新帳號明文密碼
+     * @param roleName    新帳號角色
+     * @param department  所屬部門（可為 null）
+     * @return 已建立的使用者
+     */
+    public User createUserByAdmin(User caller, String name, String email,
+                                  String rawPassword, String roleName, String department) {
         requireManageUser(caller);
-        return register(name, email, rawPassword, roleName);
+        if (userRepo.existsByEmail(email)) {
+            throw new ConflictException("Email already registered: " + email);
+        }
+        Role role = RoleFactory.create(roleName);
+        User user = new User(UUID.randomUUID(), name, email,
+                passwordEncoder.encode(rawPassword), Set.of(role), Instant.now(), department);
+        return userRepo.save(user);
     }
 
     /**
@@ -157,15 +179,31 @@ public class UserService {
      * @throws ConflictException         若新 Email 已被其他帳號使用
      */
     public User updateUser(User caller, UUID targetId, String name, String email) {
+        return updateUser(caller, targetId, name, email, null);
+    }
+
+    /**
+     * 管理員更新使用者基本資料（名稱、Email 與部門）。
+     * 採用不可變物件替換策略，保留原有密碼、角色與建立時間。
+     *
+     * @param caller     執行此操作的管理員
+     * @param targetId   欲更新的使用者 ID
+     * @param name       新名稱
+     * @param email      新 Email
+     * @param department 新部門（null 表示保留原部門）
+     * @return 已更新的使用者物件
+     */
+    public User updateUser(User caller, UUID targetId, String name, String email, String department) {
         requireManageUser(caller);
         User target = findById(targetId);
         // 若 Email 有變更，確認新 Email 未被其他帳號使用
         if (!target.getEmail().equalsIgnoreCase(email) && userRepo.existsByEmail(email)) {
             throw new ConflictException("Email already registered: " + email);
         }
+        String effectiveDept = department != null ? department : target.getDepartment();
         // 不可變替換：建立包含新欄位的 User，保留密碼、角色與建立時間
         User updated = new User(target.getId(), name, email,
-                target.getPasswordHash(), target.getRoles(), target.getCreatedAt());
+                target.getPasswordHash(), target.getRoles(), target.getCreatedAt(), effectiveDept);
         return userRepo.save(updated);
     }
 

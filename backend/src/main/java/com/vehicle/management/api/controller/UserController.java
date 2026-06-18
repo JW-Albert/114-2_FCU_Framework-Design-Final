@@ -44,7 +44,7 @@ public class UserController {
                                @Valid @RequestBody AdminCreateUserRequest req) {
         User caller = userService.findByEmail(principal.getUsername());
         User created = userService.createUserByAdmin(caller, req.name(), req.email(),
-                req.password(), req.role());
+                req.password(), req.role(), req.department());
         return UserResponse.from(created);
     }
 
@@ -53,7 +53,7 @@ public class UserController {
                                @PathVariable UUID id,
                                @Valid @RequestBody UpdateUserRequest req) {
         User caller = userService.findByEmail(principal.getUsername());
-        return UserResponse.from(userService.updateUser(caller, id, req.name(), req.email()));
+        return UserResponse.from(userService.updateUser(caller, id, req.name(), req.email(), req.department()));
     }
 
     @PatchMapping("/{id}/role")
