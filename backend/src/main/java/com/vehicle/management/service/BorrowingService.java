@@ -9,6 +9,7 @@ import com.vehicle.management.domain.strategy.StrictOverlapStrategy;
 import com.vehicle.management.repository.IBorrowingRepository;
 import com.vehicle.management.repository.IUserRepository;
 import com.vehicle.management.repository.IVehicleRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -38,32 +39,26 @@ public class BorrowingService extends BorrowingEventPublisher {
     private final IUserRepository userRepo;
     /** 衝突檢查策略，預設使用嚴格時段重疊判斷。 */
     private final ConflictCheckStrategy conflictStrategy;
-
-    /**
-     * 建構借車服務，注入所需儲存庫，並使用預設的嚴格衝突策略（不含使用者儲存庫，MANAGER 功能不可用）。
-     *
-     * @param borrowingRepo 借車申請儲存庫
-     * @param vehicleRepo   車輛儲存庫
-     */
-    public BorrowingService(IBorrowingRepository borrowingRepo,
-                            IVehicleRepository vehicleRepo) {
-        this(borrowingRepo, vehicleRepo, null);
-    }
+    /** 違規記錄服務，於還車時偵測超時並建立違規記錄。 */
+    private final ViolationService violationService;
 
     /**
      * 建構借車服務，注入所需儲存庫，並使用預設的嚴格衝突策略。
      *
-     * @param borrowingRepo 借車申請儲存庫
-     * @param vehicleRepo   車輛儲存庫
-     * @param userRepo      使用者儲存庫（用於 MANAGER 部門驗證）
+     * @param borrowingRepo    借車申請儲存庫
+     * @param vehicleRepo      車輛儲存庫
+     * @param userRepo         使用者儲存庫（用於 MANAGER 部門驗證）
+     * @param violationService 違規記錄服務（@Lazy 避免循環依賴）
      */
     public BorrowingService(IBorrowingRepository borrowingRepo,
                             IVehicleRepository vehicleRepo,
-                            IUserRepository userRepo) {
+                            IUserRepository userRepo,
+                            @Lazy ViolationService violationService) {
         this.borrowingRepo = borrowingRepo;
         this.vehicleRepo = vehicleRepo;
         this.userRepo = userRepo;
         this.conflictStrategy = new StrictOverlapStrategy();
+        this.violationService = violationService;
     }
 
     /**
@@ -193,6 +188,10 @@ public class BorrowingService extends BorrowingEventPublisher {
         request.complete(endMileage);  // State Pattern：委派給 InUseState，記錄結束里程
         BorrowingRequest saved = borrowingRepo.save(request);
         notifyCompleted(saved);  // Observer Pattern：廣播還車事件
+        // 自動偵測超時並建立違規記錄
+        if (violationService != null) {
+            violationService.checkAndCreateOverdue(saved);
+        }
         return saved;
     }
 
