@@ -53,7 +53,7 @@ public class VehicleRepositoryAdapter implements IVehicleRepository {
 
     private Vehicle toDomain(VehicleEntity e) {
         return new Vehicle(e.getId(), e.getPlate(), e.getModel(), e.getYear(),
-                VehicleStatus.valueOf(e.getStatus()), e.getCreatedAt());
+                VehicleStatus.valueOf(e.getStatus()), e.getCreatedAt(), e.getCurrentMileage());
     }
 
     private VehicleEntity toEntity(Vehicle v) {
@@ -64,6 +64,7 @@ public class VehicleRepositoryAdapter implements IVehicleRepository {
         e.setYear(v.getYear());
         e.setStatus(v.getStatus().name());
         e.setCreatedAt(v.getCreatedAt());
+        e.setCurrentMileage(v.getCurrentMileage());
         return e;
     }
 }

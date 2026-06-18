@@ -59,6 +59,7 @@
             <th>狀態</th>
             <th>備注</th>
             <th>申請時間</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -70,6 +71,26 @@
             <td><span :class="['badge', stateClass(r.state)]">{{ stateLabel(r.state) }}</span></td>
             <td>{{ r.reviewNote ?? '—' }}</td>
             <td>{{ fmt(r.createdAt) }}</td>
+            <td>
+              <div v-if="r.state === 'IN_USE'" class="complete-inline">
+                <input
+                  v-model.number="mileageMap[r.id]"
+                  type="number"
+                  min="0"
+                  placeholder="結束里程 (km)"
+                  class="mileage-input"
+                />
+                <button
+                  class="btn complete"
+                  @click="complete(r.id)"
+                  :disabled="actionLoading[r.id] || !mileageMap[r.id]"
+                >
+                  完成還車
+                </button>
+              </div>
+              <span v-else-if="r.endMileage != null" class="mileage-info">{{ r.endMileage }} km</span>
+              <span v-else>—</span>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -87,6 +108,7 @@ const pendingList = ref<BorrowingRequest[]>([])
 const allRequests = ref<BorrowingRequest[]>([])
 const vehicleMap = ref<Record<string, string>>({})
 const noteMap = ref<Record<string, string>>({})
+const mileageMap = ref<Record<string, number>>({})
 const actionLoading = ref<Record<string, boolean>>({})
 
 onMounted(async () => {
@@ -131,6 +153,20 @@ async function reject(id: string) {
   try {
     await borrowingsApi.reject(id, noteMap.value[id])
     await loadPending()
+  } finally {
+    actionLoading.value[id] = false
+  }
+}
+
+async function complete(id: string) {
+  const endMileage = mileageMap.value[id]
+  if (!endMileage && endMileage !== 0) return
+  actionLoading.value[id] = true
+  try {
+    await borrowingsApi.complete(id, endMileage)
+    await loadAll()
+  } catch (e: any) {
+    alert(e.response?.data?.message ?? '還車失敗')
   } finally {
     actionLoading.value[id] = false
   }
@@ -196,4 +232,10 @@ h3 { font-size: 1.05rem; margin-bottom: 1rem; color: #334155; }
 .badge.inuse { background: #dbeafe; color: #1d4ed8; }
 .badge.returned { background: #f1f5f9; color: #475569; }
 .empty { color: #94a3b8; font-size: 0.9rem; padding: 1rem 0; }
+.complete-inline { display: flex; gap: 0.4rem; align-items: center; }
+.mileage-input { width: 120px; padding: 0.35rem 0.55rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; }
+.mileage-input:focus { outline: none; border-color: #3b82f6; }
+.btn.complete { background: #ede9fe; color: #6d28d9; }
+.btn.complete:hover:not(:disabled) { background: #ddd6fe; }
+.mileage-info { font-size: 0.82rem; color: #475569; }
 </style>

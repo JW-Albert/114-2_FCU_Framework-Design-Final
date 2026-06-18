@@ -15,13 +15,16 @@ public record BorrowingResponse(
         String state,
         String reviewNote,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Integer startMileage,
+        Integer endMileage
 ) {
     public static BorrowingResponse from(BorrowingRequest r) {
         return new BorrowingResponse(
                 r.getId(), r.getUserId(), r.getVehicleId(),
                 r.getPeriodStart(), r.getPeriodEnd(), r.getPurpose(),
                 r.getStateName(), r.getReviewNote(),
-                r.getCreatedAt(), r.getUpdatedAt());
+                r.getCreatedAt(), r.getUpdatedAt(),
+                r.getStartMileage(), r.getEndMileage());
     }
 }

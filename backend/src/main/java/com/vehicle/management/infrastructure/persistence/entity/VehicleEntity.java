@@ -27,6 +27,9 @@ public class VehicleEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "current_mileage", nullable = false)
+    private int currentMileage = 0;
+
     public VehicleEntity() {}
 
     public UUID getId() { return id; }
@@ -41,4 +44,6 @@ public class VehicleEntity {
     public void setStatus(String status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public int getCurrentMileage() { return currentMileage; }
+    public void setCurrentMileage(int currentMileage) { this.currentMileage = currentMileage; }
 }

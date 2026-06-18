@@ -43,6 +43,7 @@
             <th>車款</th>
             <th>年份</th>
             <th>狀態</th>
+            <th>目前里程</th>
             <th>建立時間</th>
             <th>操作</th>
           </tr>
@@ -53,6 +54,7 @@
             <td>{{ v.model }}</td>
             <td>{{ v.year }}</td>
             <td><span :class="['badge', statusClass(v.status)]">{{ statusLabel(v.status) }}</span></td>
+            <td>{{ v.currentMileage.toLocaleString() }} km</td>
             <td>{{ fmt(v.createdAt) }}</td>
             <td>
               <div class="action-btns">

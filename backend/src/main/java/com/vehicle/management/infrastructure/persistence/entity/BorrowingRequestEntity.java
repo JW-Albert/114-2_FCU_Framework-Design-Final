@@ -39,6 +39,12 @@ public class BorrowingRequestEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
+    @Column(name = "start_mileage")
+    private Integer startMileage;
+
+    @Column(name = "end_mileage")
+    private Integer endMileage;
+
     public BorrowingRequestEntity() {}
 
     public UUID getId() { return id; }
@@ -61,4 +67,8 @@ public class BorrowingRequestEntity {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    public Integer getStartMileage() { return startMileage; }
+    public void setStartMileage(Integer startMileage) { this.startMileage = startMileage; }
+    public Integer getEndMileage() { return endMileage; }
+    public void setEndMileage(Integer endMileage) { this.endMileage = endMileage; }
 }

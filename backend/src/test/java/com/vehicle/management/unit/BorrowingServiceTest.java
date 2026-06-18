@@ -107,8 +107,9 @@ class BorrowingServiceTest {
 
         service.approveRequest(admin, req.getId(), null);
         service.startUse(req.getId());
-        BorrowingRequest completed = service.completeUse(req.getId());
+        BorrowingRequest completed = service.completeUse(req.getId(), 15000);
 
         assertThat(completed.getStateName()).isEqualTo("RETURNED");
+        assertThat(completed.getEndMileage()).isEqualTo(15000);
     }
 }

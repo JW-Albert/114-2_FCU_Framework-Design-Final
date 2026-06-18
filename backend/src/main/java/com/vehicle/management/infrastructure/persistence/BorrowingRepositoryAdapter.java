@@ -56,13 +56,15 @@ public class BorrowingRepositoryAdapter implements IBorrowingRepository {
                 e.getId(), e.getUserId(), e.getVehicleId(),
                 e.getPeriodStart(), e.getPeriodEnd(), e.getPurpose(), e.getCreatedAt());
         // Restore state by replaying transitions
+        int endMil = e.getEndMileage() != null ? e.getEndMileage() : 0;
         switch (e.getState()) {
             case "APPROVED" -> r.approve(e.getReviewNote());
             case "REJECTED" -> r.reject(e.getReviewNote());
             case "IN_USE"   -> { r.approve(null); r.startUse(); }
-            case "RETURNED" -> { r.approve(null); r.startUse(); r.complete(); }
+            case "RETURNED" -> { r.approve(null); r.startUse(); r.complete(endMil); }
             // PENDING: no replay needed
         }
+        r.restoreMileage(e.getStartMileage(), e.getEndMileage());
         return r;
     }
 
@@ -78,6 +80,8 @@ public class BorrowingRepositoryAdapter implements IBorrowingRepository {
         e.setReviewNote(r.getReviewNote());
         e.setCreatedAt(r.getCreatedAt());
         e.setUpdatedAt(r.getUpdatedAt());
+        e.setStartMileage(r.getStartMileage());
+        e.setEndMileage(r.getEndMileage());
         return e;
     }
 }

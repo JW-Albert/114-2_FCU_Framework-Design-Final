@@ -32,6 +32,8 @@ public class Vehicle {
     /** 可變狀態欄位，僅透過狀態守衛方法修改。 */
     private VehicleStatus status;
     private final Instant createdAt;
+    /** 車輛目前累積里程（公里），預設為 0。 */
+    private int currentMileage;
 
     /**
      * 建構車輛物件。
@@ -45,12 +47,29 @@ public class Vehicle {
      */
     public Vehicle(UUID id, String plate, String model, int year,
                    VehicleStatus status, Instant createdAt) {
+        this(id, plate, model, year, status, createdAt, 0);
+    }
+
+    /**
+     * 建構車輛物件（含里程）。
+     *
+     * @param id             車輛唯一識別碼
+     * @param plate          車牌號碼
+     * @param model          車款名稱
+     * @param year           出廠年份
+     * @param status         初始狀態
+     * @param createdAt      建立時間
+     * @param currentMileage 目前累積里程
+     */
+    public Vehicle(UUID id, String plate, String model, int year,
+                   VehicleStatus status, Instant createdAt, int currentMileage) {
         this.id = id;
         this.plate = plate;
         this.model = model;
         this.year = year;
         this.status = status;
         this.createdAt = createdAt;
+        this.currentMileage = currentMileage;
     }
 
     /**
@@ -109,4 +128,21 @@ public class Vehicle {
 
     /** @return 車輛資料建立時間 */
     public Instant getCreatedAt() { return createdAt; }
+
+    /** @return 車輛目前累積里程（公里） */
+    public int getCurrentMileage() { return currentMileage; }
+
+    /**
+     * 更新車輛累積里程。
+     *
+     * @param km 新的里程數（必須 &gt;= 目前里程）
+     * @throws IllegalArgumentException 若 km 小於目前里程（里程不可倒退）
+     */
+    public void updateMileage(int km) {
+        if (km < currentMileage) {
+            throw new IllegalArgumentException(
+                    "New mileage " + km + " is less than current mileage " + currentMileage);
+        }
+        this.currentMileage = km;
+    }
 }

@@ -1,0 +1,3 @@
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS current_mileage INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE borrowing_requests ADD COLUMN IF NOT EXISTS start_mileage INTEGER;
+ALTER TABLE borrowing_requests ADD COLUMN IF NOT EXISTS end_mileage INTEGER;

@@ -37,6 +37,10 @@ public class BorrowingRequest {
     private String reviewNote;
     private final Instant createdAt;
     private Instant updatedAt;
+    /** 出車時記錄的起始里程（可為 null）。 */
+    private Integer startMileage;
+    /** 還車時記錄的結束里程（可為 null）。 */
+    private Integer endMileage;
 
     /**
      * 建構新的借車申請，初始狀態為 {@link PendingState}（待審核）。
@@ -102,14 +106,16 @@ public class BorrowingRequest {
     }
 
     /**
-     * 完成用車並還車。
+     * 完成用車並還車，記錄結束里程。
      * 委派給目前的 {@link BorrowingState#complete} 執行狀態轉換。
      *
+     * @param endMileage 還車時的里程數
      * @throws com.vehicle.management.domain.state.InvalidStateTransitionException
      *         若目前狀態不是 IN_USE
      */
-    public void complete() {
+    public void complete(int endMileage) {
         state.complete(this);
+        this.endMileage = endMileage;
         this.updatedAt = Instant.now();
     }
 
@@ -160,4 +166,21 @@ public class BorrowingRequest {
 
     /** @return 最後更新時間 */
     public Instant getUpdatedAt() { return updatedAt; }
+
+    /** @return 出車時的起始里程（可能為 {@code null}） */
+    public Integer getStartMileage() { return startMileage; }
+
+    /** @return 還車時的結束里程（可能為 {@code null}） */
+    public Integer getEndMileage() { return endMileage; }
+
+    /**
+     * 由 Adapter 呼叫，從資料庫還原里程資料。
+     *
+     * @param startMileage 起始里程
+     * @param endMileage   結束里程
+     */
+    public void restoreMileage(Integer startMileage, Integer endMileage) {
+        this.startMileage = startMileage;
+        this.endMileage = endMileage;
+    }
 }

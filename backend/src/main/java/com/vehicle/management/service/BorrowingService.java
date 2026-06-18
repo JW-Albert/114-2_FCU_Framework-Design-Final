@@ -182,14 +182,15 @@ public class BorrowingService extends BorrowingEventPublisher {
      * @return 已更新的借車申請（狀態為 RETURNED）
      * @throws ResourceNotFoundException 若申請單 ID 不存在
      */
-    public BorrowingRequest completeUse(UUID requestId) {
+    public BorrowingRequest completeUse(UUID requestId, int endMileage) {
         BorrowingRequest request = getRequest(requestId);
-        // 同步更新車輛狀態為可用
+        // 同步更新車輛狀態為可用，並更新累積里程
         vehicleRepo.findById(request.getVehicleId()).ifPresent(v -> {
             v.markAvailable();
+            v.updateMileage(endMileage);
             vehicleRepo.save(v);
         });
-        request.complete();  // State Pattern：委派給 InUseState
+        request.complete(endMileage);  // State Pattern：委派給 InUseState，記錄結束里程
         BorrowingRequest saved = borrowingRepo.save(request);
         notifyCompleted(saved);  // Observer Pattern：廣播還車事件
         return saved;
