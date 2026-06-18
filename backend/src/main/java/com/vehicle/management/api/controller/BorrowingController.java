@@ -60,6 +60,22 @@ public class BorrowingController {
         return borrowingService.listAll().stream().map(BorrowingResponse::from).toList();
     }
 
+    /**
+     * 月曆視圖用端點：查詢 [start, end] 時段內的借用記錄（不含已拒絕）。
+     *
+     * @param start ISO-8601 時間戳（開始）
+     * @param end   ISO-8601 時間戳（結束）
+     * @return 時段內的借用申請清單
+     */
+    @GetMapping("/calendar")
+    public ResponseEntity<List<BorrowingResponse>> getCalendar(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant end) {
+        List<BorrowingResponse> result = borrowingService.listInRange(start, end)
+                .stream().map(BorrowingResponse::from).toList();
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/{id}/approve")
     public BorrowingResponse approve(@AuthenticationPrincipal UserDetails principal,
                                       @PathVariable UUID id,

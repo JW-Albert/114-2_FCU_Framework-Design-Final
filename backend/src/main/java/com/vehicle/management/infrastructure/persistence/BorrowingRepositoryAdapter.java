@@ -47,6 +47,11 @@ public class BorrowingRepositoryAdapter implements IBorrowingRepository {
     }
 
     @Override
+    public List<BorrowingRequest> findInRange(Instant start, Instant end) {
+        return jpa.findInRange(start, end).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public BorrowingRequest save(BorrowingRequest request) {
         return toDomain(jpa.save(toEntity(request)));
     }

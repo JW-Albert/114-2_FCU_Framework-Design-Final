@@ -58,6 +58,15 @@ public interface IBorrowingRepository {
     List<BorrowingRequest> findConflicting(UUID vehicleId, Instant start, Instant end);
 
     /**
+     * 查詢在給定時段內的所有借車申請（不含已拒絕者），用於月曆檢視。
+     *
+     * @param start 時段開始時間
+     * @param end   時段結束時間
+     * @return 時段內的申請清單
+     */
+    List<BorrowingRequest> findInRange(Instant start, Instant end);
+
+    /**
      * 儲存借車申請（新增或更新）。
      *
      * @param request 欲儲存的借車申請

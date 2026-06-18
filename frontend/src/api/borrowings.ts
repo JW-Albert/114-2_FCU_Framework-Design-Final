@@ -30,6 +30,9 @@ export const borrowingsApi = {
 
   listPending: () => client.get<BorrowingRequest[]>('/borrowings/pending'),
 
+  listCalendar: (start: string, end: string) =>
+    client.get<BorrowingRequest[]>('/borrowings/calendar', { params: { start, end } }),
+
   approve: (id: string, note?: string) =>
     client.post<BorrowingRequest>(`/borrowings/${id}/approve`, { note }),
 
