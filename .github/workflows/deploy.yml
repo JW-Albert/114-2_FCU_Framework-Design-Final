@@ -72,6 +72,10 @@ jobs:
           script: |
             set -e
 
+            # 將 npm global 安裝路徑改到使用者 home，避免需要 root 權限
+            export NPM_CONFIG_PREFIX="$HOME/.npm-global"
+            export PATH="$HOME/.npm-global/bin:$PATH"
+
             # 確保 PM2 已安裝（首次部署才需要）
             if ! command -v pm2 &> /dev/null; then
               npm install -g pm2
