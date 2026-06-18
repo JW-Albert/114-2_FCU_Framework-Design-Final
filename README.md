@@ -411,7 +411,7 @@ classDiagram
         -String reviewNote
         -Integer startMileage
         -Integer endMileage
-        +builder(id, userId, vehicleId, ...) Builder$
+        +builder() Builder
         -BorrowingRequest(Builder b)
     }
     class Builder {
@@ -426,7 +426,7 @@ classDiagram
         +toDomain(entity) BorrowingRequest
     }
 
-    BorrowingRequest +-- Builder
+    BorrowingRequest *-- Builder : 內部類別（nested）
     BorrowingRepositoryAdapter ..> Builder : 使用 Builder 還原狀態
 ```
 
