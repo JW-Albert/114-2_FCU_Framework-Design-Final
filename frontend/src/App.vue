@@ -15,6 +15,7 @@
         <template v-else-if="auth.isManager">
           <router-link to="/employee/borrow">借車申請</router-link>
           <router-link to="/admin/review">借車申請審核</router-link>
+          <router-link to="/admin/violations">違規記錄</router-link>
           <router-link to="/admin/calendar">借用日曆</router-link>
         </template>
         <template v-else>

@@ -8,6 +8,7 @@ import java.util.Set;
  * <p>部門主管擁有審核本部門借車申請及送出申請的權限：
  * <ul>
  *   <li>{@link Permission#APPROVE_BORROWING} — 審核（限同部門申請）</li>
+ *   <li>{@link Permission#MANAGE_VIOLATION}  — 手動登錄違規記錄</li>
  *   <li>{@link Permission#SUBMIT_REQUEST}    — 送出借車申請</li>
  * </ul>
  *
@@ -21,6 +22,7 @@ public class ManagerRole implements Role {
      */
     private static final Set<Permission> PERMISSIONS = Set.of(
             Permission.APPROVE_BORROWING,
+            Permission.MANAGE_VIOLATION,
             Permission.SUBMIT_REQUEST
     );
 
