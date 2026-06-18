@@ -85,15 +85,14 @@ jobs:
             mkdir -p ~/app
             mv ~/deploy/app.jar ~/app/app.jar
 
-            # 若 PM2 中已有此應用則重啟，否則首次啟動
-            if pm2 describe vehicle-management > /dev/null 2>&1; then
-              pm2 restart vehicle-management --update-env
-            else
-              pm2 start "java -jar $HOME/app/app.jar" \
-                --name vehicle-management \
-                --log $HOME/app/app.log \
-                --time
-            fi
+            # 停止並移除舊 process（確保啟動參數每次都更新）
+            pm2 delete vehicle-management 2>/dev/null || true
+
+            # 以 dev 模式啟動（H2 in-memory DB，無需 PostgreSQL）
+            pm2 start "java -jar $HOME/app/app.jar --spring.profiles.active=dev" \
+              --name vehicle-management \
+              --log $HOME/app/app.log \
+              --time
 
             # 保存 PM2 process list（開機自動重啟用）
             pm2 save
