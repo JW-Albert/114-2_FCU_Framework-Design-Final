@@ -6,12 +6,14 @@ import com.vehicle.management.service.PermissionDeniedException;
 import com.vehicle.management.service.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -44,6 +46,23 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public Map<String, Object> handleBadCredentials(BadCredentialsException ex) {
         return error(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    /**
+     * 處理 {@code @Valid} 請求參數驗證失敗。
+     *
+     * <p>若不在此明確處理，Spring 會將 {@link MethodArgumentNotValidException}
+     * 轉發至 {@code /error}，而 {@code JwtAuthFilter}（OncePerRequestFilter）不會在
+     * ERROR dispatch 重跑，導致 SecurityContext 為空、回傳誤導的 401（前端因而誤登出）。
+     * 在此攔截並回傳正確的 400，同時帶出各欄位的驗證訊息。</p>
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, Object> handleValidation(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getDefaultMessage())
+                .collect(Collectors.joining("; "));
+        return error(HttpStatus.BAD_REQUEST, message.isBlank() ? "請求參數驗證失敗" : message);
     }
 
     private Map<String, Object> error(HttpStatus status, String message) {

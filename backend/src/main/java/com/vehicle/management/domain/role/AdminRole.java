@@ -10,6 +10,7 @@ import java.util.Set;
  *   <li>{@link Permission#APPROVE_BORROWING} — 審核、出車、還車</li>
  *   <li>{@link Permission#MANAGE_VEHICLE}    — 車輛與保養資料管理</li>
  *   <li>{@link Permission#MANAGE_USER}       — 使用者帳號管理</li>
+ *   <li>{@link Permission#MANAGE_VIOLATION}  — 手動登錄違規記錄</li>
  *   <li>{@link Permission#SUBMIT_REQUEST}    — 送出借車申請</li>
  * </ul>
  *
@@ -26,6 +27,7 @@ public class AdminRole implements Role {
             Permission.APPROVE_BORROWING,
             Permission.MANAGE_VEHICLE,
             Permission.MANAGE_USER,
+            Permission.MANAGE_VIOLATION,
             Permission.SUBMIT_REQUEST
     );
 

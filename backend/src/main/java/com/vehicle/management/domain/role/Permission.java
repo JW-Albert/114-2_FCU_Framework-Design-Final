@@ -18,6 +18,9 @@ public enum Permission {
     /** 新增、修改、刪除使用者帳號及變更角色。 */
     MANAGE_USER,
 
+    /** 手動登錄違規記錄（管理員與部門主管適用）。 */
+    MANAGE_VIOLATION,
+
     /** 送出借車申請。 */
     SUBMIT_REQUEST
 }

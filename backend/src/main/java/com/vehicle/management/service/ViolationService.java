@@ -1,7 +1,10 @@
 package com.vehicle.management.service;
 
 import com.vehicle.management.domain.model.BorrowingRequest;
+import com.vehicle.management.domain.model.User;
 import com.vehicle.management.domain.model.ViolationRecord;
+import com.vehicle.management.domain.role.Permission;
+import com.vehicle.management.repository.IBorrowingRepository;
 import com.vehicle.management.repository.IViolationRepository;
 import org.springframework.stereotype.Service;
 
@@ -14,16 +17,57 @@ import java.util.UUID;
 /**
  * 違規記錄業務邏輯服務。
  *
- * <p>負責偵測超時還車事件並自動建立違規記錄。
- * 由 {@link BorrowingService#completeUse} 在還車時呼叫。</p>
+ * <p>負責兩種違規記錄的建立：
+ * <ul>
+ *   <li><b>自動</b>：由 {@link BorrowingService#completeUse} 在還車時呼叫
+ *       {@link #checkAndCreateOverdue}，偵測超時還車並建立 OVERDUE 記錄。</li>
+ *   <li><b>手動</b>：由管理員或部門主管透過 {@link #createManual} 針對某筆借用記錄登錄違規。</li>
+ * </ul>
  */
 @Service
 public class ViolationService {
 
     private final IViolationRepository violationRepo;
+    private final IBorrowingRepository borrowingRepo;
 
-    public ViolationService(IViolationRepository violationRepo) {
+    public ViolationService(IViolationRepository violationRepo,
+                            IBorrowingRepository borrowingRepo) {
         this.violationRepo = violationRepo;
+        this.borrowingRepo = borrowingRepo;
+    }
+
+    /**
+     * 手動登錄違規記錄。
+     *
+     * <p>違規一律關聯到一筆既有借用記錄，違規者（userId）與車輛（vehicleId）
+     * 直接自該借用記錄帶出，確保資料一致且滿足非空約束。</p>
+     *
+     * @param actor       執行登錄的使用者（須具備 {@link Permission#MANAGE_VIOLATION}）
+     * @param borrowingId 違規所關聯的借用記錄 ID
+     * @param type        違規類型（如 OVERDUE、DAMAGE、ILLEGAL_PARKING、OTHER）
+     * @param description 違規描述
+     * @return 已儲存的違規記錄
+     * @throws PermissionDeniedException 若 actor 不具備登錄違規的權限
+     * @throws ResourceNotFoundException 若借用記錄不存在
+     */
+    public ViolationRecord createManual(User actor, UUID borrowingId,
+                                        String type, String description) {
+        if (!actor.can(Permission.MANAGE_VIOLATION)) {
+            throw new PermissionDeniedException(
+                    actor.getEmail() + " cannot create violation records");
+        }
+        BorrowingRequest borrowing = borrowingRepo.findById(borrowingId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Borrowing not found: " + borrowingId));
+        ViolationRecord v = new ViolationRecord(
+                UUID.randomUUID(),
+                borrowing.getUserId(),
+                borrowing.getVehicleId(),
+                borrowingId,
+                type,
+                description,
+                Instant.now());
+        return violationRepo.save(v);
     }
 
     /**
