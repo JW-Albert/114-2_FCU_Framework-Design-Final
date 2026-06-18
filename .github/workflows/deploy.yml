@@ -92,11 +92,19 @@ jobs:
             echo "Java: $JAVA_BIN ($($JAVA_BIN -version 2>&1 | head -1))"
 
             # ── 重啟後端（port 8080，dev 模式 H2 DB）────────────────
+            # 先刪除 PM2 entry，再強制清除佔用 8080 的孤兒 Java 程序
+            # （pm2 delete 只殺 sh wrapper，Java 子程序可能以孤兒形式存活）
             pm2 delete vehicle-backend 2>/dev/null || true
-            pm2 start "$JAVA_BIN -jar $HOME/app/app.jar --spring.profiles.active=dev" \
+            sleep 2
+            fuser -k 8080/tcp 2>/dev/null || lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+            sleep 1
+
+            # 直接以 Java binary 為可執行檔啟動，避免 sh wrapper 造成孤兒問題
+            pm2 start "$JAVA_BIN" \
               --name vehicle-backend \
-              --log $HOME/app/backend.log \
-              --time
+              --log "$HOME/app/backend.log" \
+              --time \
+              -- -jar "$HOME/app/app.jar" --spring.profiles.active=dev
 
             # ── 重啟前端（port 5173，Vite dev server）────────────────
             pm2 delete vehicle-frontend 2>/dev/null || true
