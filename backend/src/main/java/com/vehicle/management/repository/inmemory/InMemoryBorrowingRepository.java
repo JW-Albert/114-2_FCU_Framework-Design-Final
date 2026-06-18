@@ -47,6 +47,14 @@ public class InMemoryBorrowingRepository implements IBorrowingRepository {
     }
 
     @Override
+    public List<BorrowingRequest> findInRange(Instant start, Instant end) {
+        return store.values().stream()
+                .filter(r -> !"REJECTED".equals(r.getStateName()))
+                .filter(r -> start.isBefore(r.getPeriodEnd()) && end.isAfter(r.getPeriodStart()))
+                .toList();
+    }
+
+    @Override
     public BorrowingRequest save(BorrowingRequest request) {
         store.put(request.getId(), request);
         return request;

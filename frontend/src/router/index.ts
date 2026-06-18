@@ -10,6 +10,7 @@ const routes = [
   { path: '/admin/maintenance', component: () => import('../views/AdminMaintenanceView.vue') },
   { path: '/admin/users', component: () => import('../views/AdminUserManagementView.vue'), meta: { adminOnly: true } },
   { path: '/admin/violations', component: () => import('../views/AdminViolationsView.vue'), meta: { requiresAuth: true, adminOnly: true } },
+  { path: '/admin/calendar', component: () => import('../views/CalendarView.vue'), meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

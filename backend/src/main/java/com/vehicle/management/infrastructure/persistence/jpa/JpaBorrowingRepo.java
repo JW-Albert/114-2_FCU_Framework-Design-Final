@@ -26,4 +26,14 @@ public interface JpaBorrowingRepo extends JpaRepository<BorrowingRequestEntity, 
             @Param("vehicleId") UUID vehicleId,
             @Param("start") Instant start,
             @Param("end") Instant end);
+
+    @Query("""
+            SELECT b FROM BorrowingRequestEntity b
+            WHERE b.state NOT IN ('REJECTED')
+              AND b.periodStart < :end
+              AND b.periodEnd   > :start
+            """)
+    List<BorrowingRequestEntity> findInRange(
+            @Param("start") Instant start,
+            @Param("end") Instant end);
 }
