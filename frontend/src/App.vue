@@ -8,6 +8,7 @@
           <router-link to="/admin/vehicles">車輛管理</router-link>
           <router-link to="/admin/maintenance">保養管理</router-link>
           <router-link to="/admin/users">使用者管理</router-link>
+          <router-link to="/admin/violations">違規記錄</router-link>
         </template>
         <template v-else>
           <router-link to="/employee/borrow">借車申請</router-link>

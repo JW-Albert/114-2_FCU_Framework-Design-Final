@@ -9,6 +9,7 @@ const routes = [
   { path: '/admin/vehicles', component: () => import('../views/AdminVehiclesView.vue') },
   { path: '/admin/maintenance', component: () => import('../views/AdminMaintenanceView.vue') },
   { path: '/admin/users', component: () => import('../views/AdminUserManagementView.vue'), meta: { adminOnly: true } },
+  { path: '/admin/violations', component: () => import('../views/AdminViolationsView.vue'), meta: { requiresAuth: true, adminOnly: true } },
 ]
 
 const router = createRouter({
