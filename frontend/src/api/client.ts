@@ -17,8 +17,16 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      const url = error.config?.url ?? '(unknown)'
+      console.warn(`[auth] 401 on ${url} — clearing session`)
       localStorage.removeItem('token')
-      window.location.href = '/login'
+      localStorage.removeItem('roles')
+      localStorage.removeItem('userEmail')
+      localStorage.removeItem('userName')
+      localStorage.removeItem('userDepartment')
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   },
