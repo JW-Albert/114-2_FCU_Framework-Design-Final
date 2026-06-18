@@ -1,6 +1,7 @@
 package com.vehicle.management.domain.observer;
 
 import com.vehicle.management.domain.model.BorrowingRequest;
+import org.springframework.stereotype.Component;
 
 /**
  * Email 通知觀察者（ConcreteObserver，Observer Pattern Ch20）。
@@ -11,6 +12,7 @@ import com.vehicle.management.domain.model.BorrowingRequest;
  * <p>替換或新增其他通知管道（SMS、推播通知）只需實作 {@link BorrowingEventObserver}
  * 並向 {@link BorrowingEventPublisher#addObserver} 註冊即可。</p>
  */
+@Component
 public class EmailNotificationObserver implements BorrowingEventObserver {
 
     /**

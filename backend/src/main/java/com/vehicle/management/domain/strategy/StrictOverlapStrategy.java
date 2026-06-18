@@ -1,6 +1,7 @@
 package com.vehicle.management.domain.strategy;
 
 import com.vehicle.management.domain.model.BorrowingRequest;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  *
  * <p><b>判斷公式：</b>{@code newStart < existingEnd && newEnd > existingStart}</p>
  */
+@Component
 public class StrictOverlapStrategy implements ConflictCheckStrategy {
 
     /**

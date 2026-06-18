@@ -4,8 +4,8 @@ import com.vehicle.management.domain.model.BorrowingRequest;
 import com.vehicle.management.domain.model.User;
 import com.vehicle.management.domain.observer.BorrowingEventPublisher;
 import com.vehicle.management.domain.role.Permission;
+import com.vehicle.management.domain.observer.BorrowingEventObserver;
 import com.vehicle.management.domain.strategy.ConflictCheckStrategy;
-import com.vehicle.management.domain.strategy.StrictOverlapStrategy;
 import com.vehicle.management.repository.IBorrowingRepository;
 import com.vehicle.management.repository.IUserRepository;
 import com.vehicle.management.repository.IVehicleRepository;
@@ -43,22 +43,30 @@ public class BorrowingService extends BorrowingEventPublisher {
     private final ViolationService violationService;
 
     /**
-     * 建構借車服務，注入所需儲存庫，並使用預設的嚴格衝突策略。
+     * 建構借車服務。
+     *
+     * <p>Spring 會自動注入所有實作 {@link BorrowingEventObserver} 的 Bean（Observer Pattern），
+     * 以及由 {@code AppConfig} 宣告的 {@link ConflictCheckStrategy} Bean（Strategy Pattern）。</p>
      *
      * @param borrowingRepo    借車申請儲存庫
      * @param vehicleRepo      車輛儲存庫
      * @param userRepo         使用者儲存庫（用於 MANAGER 部門驗證）
      * @param violationService 違規記錄服務（@Lazy 避免循環依賴）
+     * @param conflictStrategy 衝突檢查策略，由 Spring 注入（預設 StrictOverlapStrategy）
+     * @param observers        所有已註冊的事件觀察者，由 Spring 自動收集
      */
     public BorrowingService(IBorrowingRepository borrowingRepo,
                             IVehicleRepository vehicleRepo,
                             IUserRepository userRepo,
-                            @Lazy ViolationService violationService) {
+                            @Lazy ViolationService violationService,
+                            ConflictCheckStrategy conflictStrategy,
+                            List<BorrowingEventObserver> observers) {
         this.borrowingRepo = borrowingRepo;
         this.vehicleRepo = vehicleRepo;
         this.userRepo = userRepo;
-        this.conflictStrategy = new StrictOverlapStrategy();
+        this.conflictStrategy = conflictStrategy;
         this.violationService = violationService;
+        observers.forEach(this::addObserver);
     }
 
     /**

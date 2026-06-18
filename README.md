@@ -106,35 +106,282 @@
 
 ## 設計模式應用
 
-### State Pattern（Ch19）— 借車申請生命週期
+本專案實作了 **6 個 GoF 設計模式**，涵蓋 Behavioral、Structural、Creational 三大分類。
 
-`BorrowingRequest` 持有一個 `BorrowingState` 介面，狀態轉換邏輯封裝於各 ConcreteState 類別，避免在 Service 層堆積 `if-else` 判斷。
+| # | 模式 | 分類 | 主要類別 |
+|---|------|------|---------|
+| 1 | [State](#1-state-pattern--借車申請生命週期) | Behavioral | `BorrowingRequest`, `BorrowingState`, `PendingState`… |
+| 2 | [Observer](#2-observer-pattern--借車事件通知) | Behavioral | `BorrowingEventPublisher`, `EmailNotificationObserver` |
+| 3 | [Strategy](#3-strategy-pattern--時段衝突檢查) | Behavioral | `ConflictCheckStrategy`, `StrictOverlapStrategy` |
+| 4 | [Template Method](#4-template-method-pattern--服務層權限守衛) | Behavioral | `AbstractProtectedService`, `VehicleService`, `MaintenanceService` |
+| 5 | [Factory Method](#5-factory-method-pattern--角色建立) | Creational | `RoleFactory`, `AdminRole`, `EmployeeRole`, `ManagerRole` |
+| 6 | [Adapter](#6-adapter-pattern--repository-橋接) | Structural | `*RepositoryAdapter`, `Jpa*Repo` |
 
+---
+
+### 1. State Pattern — 借車申請生命週期
+
+**問題**：借車申請有 5 種狀態，每種狀態只允許特定的轉換操作，若用 `if-else` 判斷狀態字串，Service 層會充滿分支邏輯。
+
+**解法**：`BorrowingRequest`（Context）持有 `BorrowingState` 介面，所有狀態轉換邏輯封裝在各 ConcreteState 類別。非法轉換拋出 `InvalidStateTransitionException`（HTTP 422）。
+
+```mermaid
+classDiagram
+    class BorrowingRequest {
+        -BorrowingState state
+        +approve(reviewNote)
+        +reject(reviewNote)
+        +startUse()
+        +complete(endMileage)
+        +transitionState(newState, note)
+    }
+    class BorrowingState {
+        <<interface>>
+        +approve(BorrowingRequest, note)
+        +reject(BorrowingRequest, note)
+        +startUse(BorrowingRequest)
+        +complete(BorrowingRequest)
+        +getStateName() String
+    }
+    class PendingState {
+        +approve() → ApprovedState
+        +reject() → RejectedState
+    }
+    class ApprovedState {
+        +startUse() → InUseState
+    }
+    class InUseState {
+        +complete() → ReturnedState
+    }
+    class ReturnedState {
+        +所有操作拋出例外
+    }
+    class RejectedState {
+        +所有操作拋出例外
+    }
+
+    BorrowingRequest o--> BorrowingState : state
+    BorrowingState <|.. PendingState
+    BorrowingState <|.. ApprovedState
+    BorrowingState <|.. InUseState
+    BorrowingState <|.. ReturnedState
+    BorrowingState <|.. RejectedState
 ```
-[PendingState]
-    ├─ approve() ──→ [ApprovedState]
-    │                    └─ startUse() ──→ [InUseState]
-    │                                          └─ complete() ──→ [ReturnedState]
-    └─ reject()  ──→ [RejectedState]
+
+**狀態流轉圖：**
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING : submitRequest()
+    PENDING --> APPROVED : approve()
+    PENDING --> REJECTED : reject()
+    APPROVED --> IN_USE : startUse()
+    IN_USE --> RETURNED : complete()
+    RETURNED --> [*]
+    REJECTED --> [*]
 ```
 
-非法的狀態轉換（例如從 `InUseState` 呼叫 `approve()`）會拋出 `InvalidStateTransitionException`，由 `GlobalExceptionHandler` 映射為 HTTP 422。
+---
 
-### Observer Pattern（Ch20）— 借車事件通知
+### 2. Observer Pattern — 借車事件通知
 
-`BorrowingService` 繼承 `BorrowingEventPublisher`（Subject），當申請狀態變更時廣播通知所有已註冊的 `BorrowingEventObserver`（如 `EmailNotificationObserver`）。Service 層不感知具體通知實作，符合 DIP。
+**問題**：借車申請狀態變更時需通知相關人員，但通知邏輯（Email、簡訊、推播）不應寫死在 Service 內。
 
-### Strategy Pattern（Ch18）— 時段衝突檢查
+**解法**：`BorrowingService` 繼承 `BorrowingEventPublisher`（Subject），Spring 自動注入所有實作 `BorrowingEventObserver` 的 Bean，Service 只呼叫 `notifyApproved()` 等方法，不感知具體通知實作（DIP）。
 
-`BorrowingService` 注入 `ConflictCheckStrategy` 介面，預設使用 `StrictOverlapStrategy`（嚴格重疊檢查）。未來可替換為寬鬆策略（如僅同一天才衝突）而不修改 Service。
+```mermaid
+classDiagram
+    class BorrowingEventPublisher {
+        <<abstract>>
+        -List~BorrowingEventObserver~ observers
+        +addObserver(obs)
+        +removeObserver(obs)
+        #notifyApproved(req)
+        #notifyRejected(req)
+        #notifyStarted(req)
+        #notifyCompleted(req)
+    }
+    class BorrowingEventObserver {
+        <<interface>>
+        +onApproved(BorrowingRequest)
+        +onRejected(BorrowingRequest)
+        +onStarted(BorrowingRequest)
+        +onCompleted(BorrowingRequest)
+    }
+    class BorrowingService {
+        +approveRequest() → notifyApproved()
+        +rejectRequest() → notifyRejected()
+        +startUse() → notifyStarted()
+        +completeUse() → notifyCompleted()
+    }
+    class EmailNotificationObserver {
+        +onApproved() : 印出 Email 通知
+        +onRejected() : 印出 Email 通知
+        +onStarted() : 印出 Email 通知
+        +onCompleted() : 印出 Email 通知
+    }
 
-### Factory Method（Ch11）— 角色建立
+    BorrowingEventPublisher <|-- BorrowingService
+    BorrowingEventObserver <|.. EmailNotificationObserver
+    BorrowingEventPublisher o--> BorrowingEventObserver : observers
+```
 
-`RoleFactory.create(roleName)` 集中管理 `Role` 物件的建立，呼叫端只依賴 `Role` 介面，不感知 `AdminRole` / `EmployeeRole` 的存在（OCP）。
+> 新增通知管道（SMS、Line 推播）只需實作 `BorrowingEventObserver` 並標記 `@Component`，Spring 自動注入、無需修改任何現有程式碼（OCP）。
 
-### Adapter Pattern（Ch14）— Repository 橋接
+---
 
-`VehicleRepositoryAdapter`、`BorrowingRepositoryAdapter` 等類別將 Spring Data JPA 介面轉換為 Domain 所需的 `IVehicleRepository` 等介面，Service 層完全不感知 JPA 存在（DIP）。
+### 3. Strategy Pattern — 時段衝突檢查
+
+**問題**：衝突判斷的演算法多樣（嚴格重疊、寬鬆同日、加緩衝時間），若寫死在 Service 中，更換邏輯需修改 Service 本身。
+
+**解法**：`ConflictCheckStrategy` 介面定義演算法骨架，`StrictOverlapStrategy` 為預設實作，由 Spring DI 注入 `BorrowingService`。替換策略只需更換 `@Bean` 設定（OCP）。
+
+```mermaid
+classDiagram
+    class ConflictCheckStrategy {
+        <<interface>>
+        +hasConflict(existingRequests, periodStart, periodEnd) boolean
+    }
+    class StrictOverlapStrategy {
+        +hasConflict() : newStart < existEnd AND newEnd > existStart
+        -isActiveState(state) boolean
+    }
+    class BorrowingService {
+        -ConflictCheckStrategy conflictStrategy
+        +submitRequest() : if conflictStrategy.hasConflict()...
+    }
+
+    ConflictCheckStrategy <|.. StrictOverlapStrategy
+    BorrowingService --> ConflictCheckStrategy : 注入（Spring DI）
+```
+
+> 未來可引入 Decorator Pattern（#65）在不修改任何現有策略的情況下疊加「緩衝時間」規則。
+
+---
+
+### 4. Template Method Pattern — 服務層權限守衛
+
+**問題**：`VehicleService`、`MaintenanceService`、`UserService` 每個 `public` 方法都以相同的 `if (!actor.can(permission)) throw new PermissionDeniedException(...)` 開頭，違反 DRY；未來需加入稽核日誌時，需修改每個 Service。
+
+**解法**：`AbstractProtectedService` 定義「先驗證、後執行」的演算法骨架（Template Method），子類別以 lambda 提供業務邏輯。
+
+```mermaid
+classDiagram
+    class AbstractProtectedService {
+        <<abstract>>
+        #requirePermission(actor, perm, Runnable action)
+        #supply~T~(actor, perm, Supplier~T~ action) T
+        -checkPermission(actor, perm)
+    }
+    class VehicleService {
+        +createVehicle(actor, ...) : supply(MANAGE_VEHICLE, ...)
+        +updateVehicle(actor, ...) : supply(MANAGE_VEHICLE, ...)
+        +deleteVehicle(actor, ...) : requirePermission(MANAGE_VEHICLE, ...)
+    }
+    class MaintenanceService {
+        +addRecord(actor, ...) : supply(MANAGE_VEHICLE, ...)
+        +deleteRecord(actor, ...) : requirePermission(MANAGE_VEHICLE, ...)
+    }
+    class UserService {
+        +createUserByAdmin(actor, ...) : 檢查 MANAGE_USER
+        +changeUserRole(actor, ...) : 檢查 MANAGE_USER
+    }
+
+    AbstractProtectedService <|-- VehicleService
+    AbstractProtectedService <|-- MaintenanceService
+    AbstractProtectedService <|-- UserService
+```
+
+---
+
+### 5. Factory Method Pattern — 角色建立
+
+**問題**：`UserService` 需依字串（如 `"ADMIN"`）建立對應的 `Role` 物件，若直接 `new AdminRole()` 會產生對具體類別的直接依賴。
+
+**解法**：`RoleFactory.create(roleName)` 集中管理 `Role` 物件建立，呼叫端只依賴 `Role` 介面（DIP）。新增角色只需加入新類別與一行 `case`，不需修改呼叫端（OCP）。
+
+```mermaid
+classDiagram
+    class Role {
+        <<interface>>
+        +getName() String
+        +getPermissions() Set~Permission~
+    }
+    class AdminRole {
+        +getName() : "ADMIN"
+        +getPermissions() : APPROVE_BORROWING, MANAGE_VEHICLE, MANAGE_USER, SUBMIT_REQUEST
+    }
+    class EmployeeRole {
+        +getName() : "EMPLOYEE"
+        +getPermissions() : SUBMIT_REQUEST
+    }
+    class ManagerRole {
+        +getName() : "MANAGER"
+        +getPermissions() : APPROVE_BORROWING, SUBMIT_REQUEST
+    }
+    class RoleFactory {
+        <<utility>>
+        +create(roleName) Role
+    }
+    class Permission {
+        <<enum>>
+        APPROVE_BORROWING
+        MANAGE_VEHICLE
+        MANAGE_USER
+        SUBMIT_REQUEST
+    }
+
+    Role <|.. AdminRole
+    Role <|.. EmployeeRole
+    Role <|.. ManagerRole
+    RoleFactory ..> Role : creates
+    Role --> Permission
+```
+
+---
+
+### 6. Adapter Pattern — Repository 橋接
+
+**問題**：Domain 層定義了 `IVehicleRepository` 等領域介面，但資料持久化使用 Spring Data JPA，其介面（`JpaRepository`）與 Domain 介面不相容。
+
+**解法**：每個 `*RepositoryAdapter` 類別實作 Domain 介面（Target），內部持有 JPA Repository（Adaptee），透過 `toDomain()` / `toEntity()` 轉換進行橋接（Object Adapter）。Service 層不感知 JPA 的存在（DIP）。
+
+```mermaid
+classDiagram
+    class IVehicleRepository {
+        <<interface>>
+        +findById(id) Optional~Vehicle~
+        +findAll() List~Vehicle~
+        +findAvailable(start, end) List~Vehicle~
+        +save(vehicle) Vehicle
+        +delete(id)
+    }
+    class VehicleRepositoryAdapter {
+        -JpaVehicleRepo jpa
+        +findById(id) : jpa.findById().map(toDomain)
+        +save(v) : jpa.save(toEntity(v))
+        -toDomain(entity) Vehicle
+        -toEntity(vehicle) VehicleEntity
+    }
+    class JpaVehicleRepo {
+        <<Spring Data JPA>>
+        +findById(UUID)
+        +findAll()
+        +save(VehicleEntity)
+    }
+    class VehicleEntity {
+        UUID id
+        String plate
+        String model
+        ...
+    }
+
+    IVehicleRepository <|.. VehicleRepositoryAdapter
+    VehicleRepositoryAdapter --> JpaVehicleRepo : delegates
+    JpaVehicleRepo --> VehicleEntity : manages
+```
+
+> 5 個 Adapter 結構相同：`BorrowingRepositoryAdapter`、`UserRepositoryAdapter`、`MaintenanceRepositoryAdapter`、`ViolationRepositoryAdapter`。
 
 ---
 
@@ -143,38 +390,60 @@
 | 原則 | 應用位置 |
 |------|----------|
 | **SRP** | Service 層分為 BorrowingService / VehicleService / MaintenanceService / UserService，各自只有單一修改理由 |
-| **OCP** | `Role` 介面 + Factory Method，新增角色不需修改既有程式碼；State Pattern 同理 |
-| **DIP** | 所有 Service 依賴 Repository 介面而非 JPA 實作；測試注入 InMemory 實作 |
-| **LoD** | Service 呼叫 `request.approve()` 委派給 State，不直接操作狀態字串 |
-| **組合優於繼承** | `User` 持有 `Set<Role>`，`Role` 持有 `Set<Permission>`，角色以組合方式設計 |
+| **OCP** | Factory Method 新增角色免改舊程式碼；Observer 新增通知管道免改 Service；Strategy 替換演算法免改 Context |
+| **DIP** | 所有 Service 依賴 Repository 介面（非 JPA 實作）；Strategy 與 Observer 依賴抽象介面注入 |
+| **LoD** | Service 呼叫 `request.approve()` 委派給 State，不直接操作狀態字串；`MaintenanceService` 呼叫 `record.isDue()` 而非讀取欄位 |
+| **DRY** | `AbstractProtectedService` 統一權限守衛邏輯，消除各 Service 的重複 `if-throw` |
+| **組合優於繼承** | `User` 持有 `Set<Role>`，`Role` 持有 `Set<Permission>`，角色以組合方式擴充 |
+
+---
+
+## 規劃中的設計模式擴充
+
+| Issue | 模式 | 動機 |
+|-------|------|------|
+| [#63](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/63) | Builder | 重構 `BorrowingRepositoryAdapter.toDomain()` 狀態還原邏輯，避免重播 State transition |
+| [#64](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/64) | Chain of Responsibility | 重構 `submitRequest()` 多步驟驗證，讓新規則以新 Bean 方式加入 |
+| [#65](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/65) | Decorator | `ConflictCheckStrategy` 可疊加「緩衝時間」等規則，不修改現有策略 |
+| [#66](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/66) | Command | 封裝借車生命週期操作，支援稽核日誌與未來異步處理 |
 
 ---
 
 ## UML 設計圖
 
-### 類別圖 — 領域模型與設計模式
-
-> 涵蓋 Domain Model、State Pattern、Observer Pattern、Strategy Pattern、Factory Method。
-
-![類別圖](img/class-diagram.png)
-
----
-
 ### 狀態圖 — 借車申請生命週期（State Pattern）
 
-![狀態圖](img/state-diagram.png)
+> 同上方 [State Pattern](#1-state-pattern--借車申請生命週期) 章節的 `stateDiagram-v2`。
 
 ---
 
 ### 循序圖 — 完整借車工作流程
 
-![循序圖](img/sequence-diagram.png)
+```mermaid
+sequenceDiagram
+    actor Employee
+    actor Admin
+    participant Controller as BorrowingController
+    participant Service as BorrowingService
+    participant State as BorrowingState
+    participant Publisher as BorrowingEventPublisher
+    participant Observer as EmailNotificationObserver
 
----
+    Employee->>Controller: POST /api/borrowings (submit)
+    Controller->>Service: submitRequest(employee, vehicleId, start, end)
+    Service->>Service: conflictStrategy.hasConflict()
+    Service->>State: new PendingState()
+    Service-->>Controller: BorrowingRequest (PENDING)
 
-### 架構圖 — Repository Adapter Pattern（DIP 應用）
-
-![架構圖](img/architecture-diagram.png)
+    Admin->>Controller: POST /api/borrowings/{id}/approve
+    Controller->>Service: approveRequest(admin, id, note)
+    Service->>State: state.approve(request, note)
+    State->>State: transitionState → ApprovedState
+    Service->>Publisher: notifyApproved(request)
+    Publisher->>Observer: onApproved(request)
+    Observer-->>Observer: 印出 Email 通知
+    Service-->>Controller: BorrowingRequest (APPROVED)
+```
 
 ---
 
