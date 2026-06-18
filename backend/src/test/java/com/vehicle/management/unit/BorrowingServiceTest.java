@@ -5,6 +5,7 @@ import com.vehicle.management.domain.model.User;
 import com.vehicle.management.domain.model.Vehicle;
 import com.vehicle.management.domain.model.VehicleStatus;
 import com.vehicle.management.domain.role.RoleFactory;
+import com.vehicle.management.domain.strategy.StrictOverlapStrategy;
 import com.vehicle.management.repository.inmemory.InMemoryBorrowingRepository;
 import com.vehicle.management.repository.inmemory.InMemoryUserRepository;
 import com.vehicle.management.repository.inmemory.InMemoryVehicleRepository;
@@ -34,7 +35,8 @@ class BorrowingServiceTest {
         vehicleRepo = new InMemoryVehicleRepository();
         InMemoryBorrowingRepository borrowingRepo = new InMemoryBorrowingRepository();
         InMemoryUserRepository userRepo = new InMemoryUserRepository();
-        service = new BorrowingService(borrowingRepo, vehicleRepo, userRepo, null);
+        service = new BorrowingService(borrowingRepo, vehicleRepo, userRepo, null,
+                new StrictOverlapStrategy(), java.util.List.of());
 
         employee = new User(UUID.randomUUID(), "Alice", "alice@example.com",
                 "hash", Set.of(RoleFactory.create("EMPLOYEE")), Instant.now());
