@@ -118,7 +118,7 @@ class UserControllerTest {
     @WithMockUser(username = "admin@test.com")
     void createUser_adminReturns201() throws Exception {
         when(userService.findByEmail("admin@test.com")).thenReturn(admin);
-        when(userService.createUserByAdmin(eq(admin), anyString(), anyString(), anyString(), anyString()))
+        when(userService.createUserByAdmin(eq(admin), anyString(), anyString(), anyString(), anyString(), any()))
                 .thenReturn(targetUser);
 
         Map<String, String> body = Map.of(
@@ -141,7 +141,7 @@ class UserControllerTest {
         User updated = new User(targetUser.getId(), "Updated", "updated@test.com",
                 "hash", Set.of(RoleFactory.create("EMPLOYEE")), targetUser.getCreatedAt());
         when(userService.findByEmail("admin@test.com")).thenReturn(admin);
-        when(userService.updateUser(eq(admin), eq(targetUser.getId()), anyString(), anyString()))
+        when(userService.updateUser(eq(admin), eq(targetUser.getId()), anyString(), anyString(), any()))
                 .thenReturn(updated);
 
         Map<String, String> body = Map.of("name", "Updated", "email", "updated@test.com");

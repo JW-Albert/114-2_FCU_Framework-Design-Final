@@ -22,8 +22,13 @@
           <label>身分</label>
           <select v-model="form.role">
             <option value="EMPLOYEE">員工</option>
+            <option value="MANAGER">部門主管</option>
             <option value="ADMIN">管理員</option>
           </select>
+        </div>
+        <div class="field">
+          <label>部門</label>
+          <input v-model="form.department" placeholder="例：資訊部" />
         </div>
         <div class="form-actions">
           <button class="btn primary" @click="saveUser" :disabled="saving">
@@ -50,6 +55,7 @@
             <th>姓名</th>
             <th>Email</th>
             <th>身分</th>
+            <th>部門</th>
             <th>建立時間</th>
             <th>操作</th>
           </tr>
@@ -63,6 +69,7 @@
                 {{ roleLabel(r) }}
               </span>
             </td>
+            <td>{{ u.department ?? '—' }}</td>
             <td>{{ fmt(u.createdAt) }}</td>
             <td>
               <div class="action-btns">
@@ -86,7 +93,7 @@ const loading = ref(false)
 const saving = ref(false)
 const formError = ref('')
 const editId = ref<string | null>(null)
-const form = ref({ name: '', email: '', password: '', role: 'EMPLOYEE' })
+const form = ref({ name: '', email: '', password: '', role: 'EMPLOYEE', department: '' })
 
 onMounted(loadUsers)
 
@@ -103,7 +110,7 @@ async function loadUsers() {
 }
 
 async function saveUser() {
-  const { name, email, password, role } = form.value
+  const { name, email, password, role, department } = form.value
   if (!name.trim() || !email.trim()) {
     formError.value = '請填寫姓名與 Email'
     return
@@ -116,13 +123,13 @@ async function saveUser() {
   formError.value = ''
   try {
     if (editId.value) {
-      await usersApi.update(editId.value, name, email)
+      await usersApi.update(editId.value, name, email, department || undefined)
       const currentUser = users.value.find(u => u.id === editId.value)
       if (currentUser && currentUser.roles[0] !== role) {
         await usersApi.changeRole(editId.value, role)
       }
     } else {
-      await usersApi.create(name, email, password, role)
+      await usersApi.create(name, email, password, role, department || undefined)
     }
     cancelEdit()
     await loadUsers()
@@ -145,13 +152,13 @@ async function deleteUser(id: string) {
 
 function startEdit(u: UserRecord) {
   editId.value = u.id
-  form.value = { name: u.name, email: u.email, password: '', role: u.roles[0] ?? 'EMPLOYEE' }
+  form.value = { name: u.name, email: u.email, password: '', role: u.roles[0] ?? 'EMPLOYEE', department: u.department ?? '' }
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function cancelEdit() {
   editId.value = null
-  form.value = { name: '', email: '', password: '', role: 'EMPLOYEE' }
+  form.value = { name: '', email: '', password: '', role: 'EMPLOYEE', department: '' }
   formError.value = ''
 }
 
@@ -160,11 +167,15 @@ function fmt(iso: string) {
 }
 
 function roleLabel(r: string) {
-  return r === 'ADMIN' ? '管理員' : '員工'
+  if (r === 'ADMIN') return '管理員'
+  if (r === 'MANAGER') return '部門主管'
+  return '員工'
 }
 
 function roleClass(r: string) {
-  return r === 'ADMIN' ? 'admin' : 'employee'
+  if (r === 'ADMIN') return 'admin'
+  if (r === 'MANAGER') return 'manager'
+  return 'employee'
 }
 </script>
 
@@ -185,6 +196,7 @@ input:focus, select:focus { outline: none; border-color: #3b82f6; }
 .table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
 .badge { padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-right: 0.25rem; }
 .badge.admin { background: #ede9fe; color: #6d28d9; }
+.badge.manager { background: #fef3c7; color: #92400e; }
 .badge.employee { background: #dbeafe; color: #1d4ed8; }
 .action-btns { display: flex; gap: 0.4rem; }
 .btn-icon { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.2rem 0.4rem; border-radius: 4px; transition: background .15s; }

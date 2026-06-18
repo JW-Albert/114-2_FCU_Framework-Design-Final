@@ -7,6 +7,7 @@ import com.vehicle.management.domain.role.Permission;
 import com.vehicle.management.domain.strategy.ConflictCheckStrategy;
 import com.vehicle.management.domain.strategy.StrictOverlapStrategy;
 import com.vehicle.management.repository.IBorrowingRepository;
+import com.vehicle.management.repository.IUserRepository;
 import com.vehicle.management.repository.IVehicleRepository;
 import org.springframework.stereotype.Service;
 
@@ -34,19 +35,34 @@ public class BorrowingService extends BorrowingEventPublisher {
 
     private final IBorrowingRepository borrowingRepo;
     private final IVehicleRepository vehicleRepo;
+    private final IUserRepository userRepo;
     /** 衝突檢查策略，預設使用嚴格時段重疊判斷。 */
     private final ConflictCheckStrategy conflictStrategy;
 
     /**
-     * 建構借車服務，注入所需儲存庫，並使用預設的嚴格衝突策略。
+     * 建構借車服務，注入所需儲存庫，並使用預設的嚴格衝突策略（不含使用者儲存庫，MANAGER 功能不可用）。
      *
      * @param borrowingRepo 借車申請儲存庫
      * @param vehicleRepo   車輛儲存庫
      */
     public BorrowingService(IBorrowingRepository borrowingRepo,
                             IVehicleRepository vehicleRepo) {
+        this(borrowingRepo, vehicleRepo, null);
+    }
+
+    /**
+     * 建構借車服務，注入所需儲存庫，並使用預設的嚴格衝突策略。
+     *
+     * @param borrowingRepo 借車申請儲存庫
+     * @param vehicleRepo   車輛儲存庫
+     * @param userRepo      使用者儲存庫（用於 MANAGER 部門驗證）
+     */
+    public BorrowingService(IBorrowingRepository borrowingRepo,
+                            IVehicleRepository vehicleRepo,
+                            IUserRepository userRepo) {
         this.borrowingRepo = borrowingRepo;
         this.vehicleRepo = vehicleRepo;
+        this.userRepo = userRepo;
         this.conflictStrategy = new StrictOverlapStrategy();
     }
 
@@ -108,6 +124,8 @@ public class BorrowingService extends BorrowingEventPublisher {
             throw new PermissionDeniedException(actor.getEmail() + " cannot approve requests");
         }
         BorrowingRequest request = getRequest(requestId);
+        // MANAGER 部門範圍限制：只能審核同部門申請者的申請
+        checkManagerDepartmentScope(actor, request);
         request.approve(note);  // State Pattern：委派給 PendingState
         BorrowingRequest saved = borrowingRepo.save(request);
         notifyApproved(saved);  // Observer Pattern：廣播核准事件
@@ -129,6 +147,8 @@ public class BorrowingService extends BorrowingEventPublisher {
             throw new PermissionDeniedException(actor.getEmail() + " cannot reject requests");
         }
         BorrowingRequest request = getRequest(requestId);
+        // MANAGER 部門範圍限制：只能審核同部門申請者的申請
+        checkManagerDepartmentScope(actor, request);
         request.reject(note);  // State Pattern：委派給 PendingState
         BorrowingRequest saved = borrowingRepo.save(request);
         notifyRejected(saved);  // Observer Pattern：廣播拒絕事件
@@ -213,5 +233,32 @@ public class BorrowingService extends BorrowingEventPublisher {
     private BorrowingRequest getRequest(UUID id) {
         return borrowingRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found: " + id));
+    }
+
+    /**
+     * 若 actor 為 MANAGER 角色，驗證申請者與 actor 屬於同一部門。
+     * ADMIN 角色不受此限制。
+     *
+     * @param actor   執行審核的使用者
+     * @param request 借車申請
+     * @throws PermissionDeniedException 若部門不符或申請者未設定部門
+     */
+    private void checkManagerDepartmentScope(User actor, BorrowingRequest request) {
+        boolean isManager = actor.getRoles().stream()
+                .anyMatch(r -> "MANAGER".equals(r.getName()));
+        if (!isManager) return;
+        if (userRepo == null) return;
+
+        String managerDept = actor.getDepartment();
+        if (managerDept == null || managerDept.isBlank()) {
+            throw new PermissionDeniedException("Manager has no department assigned");
+        }
+        User requester = userRepo.findById(request.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Requester not found: " + request.getUserId()));
+        if (!managerDept.equals(requester.getDepartment())) {
+            throw new PermissionDeniedException(
+                    "Manager can only review requests from the same department");
+        }
     }
 }

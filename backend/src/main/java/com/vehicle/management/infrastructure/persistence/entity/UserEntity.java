@@ -32,6 +32,9 @@ public class UserEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "department", length = 100)
+    private String department;
+
     public UserEntity() {}
 
     public UUID getId() { return id; }
@@ -46,4 +49,6 @@ public class UserEntity {
     public void setRoleNames(Set<String> roleNames) { this.roleNames = roleNames; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public String getDepartment() { return department; }
+    public void setDepartment(String department) { this.department = department; }
 }

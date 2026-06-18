@@ -11,13 +11,14 @@ public record UserResponse(
         String name,
         String email,
         List<String> roles,
-        Instant createdAt
+        Instant createdAt,
+        String department
 ) {
     public static UserResponse from(User u) {
         List<String> roleNames = u.getRoles().stream()
                 .map(r -> r.getName())
                 .sorted()
                 .toList();
-        return new UserResponse(u.getId(), u.getName(), u.getEmail(), roleNames, u.getCreatedAt());
+        return new UserResponse(u.getId(), u.getName(), u.getEmail(), roleNames, u.getCreatedAt(), u.getDepartment());
     }
 }

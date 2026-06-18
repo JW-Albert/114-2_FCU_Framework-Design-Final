@@ -60,7 +60,7 @@ public class UserRepositoryAdapter implements IUserRepository {
                 .map(RoleFactory::create)   // Factory Method (Ch11)
                 .collect(Collectors.toSet());
         return new User(e.getId(), e.getName(), e.getEmail(),
-                e.getPasswordHash(), roles, e.getCreatedAt());
+                e.getPasswordHash(), roles, e.getCreatedAt(), e.getDepartment());
     }
 
     private UserEntity toEntity(User u) {
@@ -72,6 +72,7 @@ public class UserRepositoryAdapter implements IUserRepository {
         e.setRoleNames(u.getRoles().stream()
                 .map(Role::getName).collect(Collectors.toSet()));
         e.setCreatedAt(u.getCreatedAt());
+        e.setDepartment(u.getDepartment());
         return e;
     }
 }

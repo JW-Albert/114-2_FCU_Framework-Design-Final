@@ -31,6 +31,7 @@ public class RoleFactory {
         return switch (roleName.toUpperCase()) {
             case "ADMIN"    -> new AdminRole();
             case "EMPLOYEE" -> new EmployeeRole();
+            case "MANAGER"  -> new ManagerRole();
             default -> throw new IllegalArgumentException("Unknown role: " + roleName);
         };
     }

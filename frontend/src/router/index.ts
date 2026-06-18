@@ -5,7 +5,7 @@ const routes = [
   { path: '/', redirect: '/login' },
   { path: '/login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
   { path: '/employee/borrow', component: () => import('../views/EmployeeBorrowView.vue') },
-  { path: '/admin/review', component: () => import('../views/AdminReviewView.vue') },
+  { path: '/admin/review', component: () => import('../views/AdminReviewView.vue'), meta: { approverOnly: true } },
   { path: '/admin/vehicles', component: () => import('../views/AdminVehiclesView.vue') },
   { path: '/admin/maintenance', component: () => import('../views/AdminMaintenanceView.vue') },
   { path: '/admin/users', component: () => import('../views/AdminUserManagementView.vue'), meta: { adminOnly: true } },
@@ -22,6 +22,9 @@ router.beforeEach((to) => {
     return '/login'
   }
   if (to.meta.adminOnly && !auth.isAdmin) {
+    return '/login'
+  }
+  if (to.meta.approverOnly && !auth.isAdmin && !auth.isManager) {
     return '/login'
   }
 })

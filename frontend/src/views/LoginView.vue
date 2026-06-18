@@ -40,8 +40,8 @@ async function handleLogin() {
   loading.value = true
   try {
     const { data } = await authApi.login(form.value.email, form.value.password)
-    auth.setToken(data.token, data.roles, data.email, data.name)
-    if (auth.isAdmin) {
+    auth.setToken(data.token, data.roles, data.email, data.name, data.department)
+    if (auth.isAdmin || auth.isManager) {
       router.push('/admin/review')
     } else {
       router.push('/employee/borrow')

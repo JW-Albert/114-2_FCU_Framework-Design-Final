@@ -29,6 +29,7 @@ public class User {
     private final String passwordHash;
     private final Set<Role> roles;
     private final Instant createdAt;
+    private final String department;
 
     /**
      * 建構使用者物件。
@@ -42,12 +43,29 @@ public class User {
      */
     public User(UUID id, String name, String email, String passwordHash,
                 Set<Role> roles, Instant createdAt) {
+        this(id, name, email, passwordHash, roles, createdAt, null);
+    }
+
+    /**
+     * 建構使用者物件（含部門）。
+     *
+     * @param id           使用者唯一識別碼
+     * @param name         顯示名稱
+     * @param email        登入用 Email（系統內唯一）
+     * @param passwordHash BCrypt 雜湊後的密碼，不應傳入明文
+     * @param roles        使用者擁有的角色集合（至少一個）
+     * @param createdAt    帳號建立時間
+     * @param department   所屬部門（可為 null）
+     */
+    public User(UUID id, String name, String email, String passwordHash,
+                Set<Role> roles, Instant createdAt, String department) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.passwordHash = passwordHash;
         this.roles = new HashSet<>(roles);
         this.createdAt = createdAt;
+        this.department = department;
     }
 
     /**
@@ -85,4 +103,7 @@ public class User {
 
     /** @return 帳號建立時間 */
     public Instant getCreatedAt() { return createdAt; }
+
+    /** @return 所屬部門（可為 null） */
+    public String getDepartment() { return department; }
 }
