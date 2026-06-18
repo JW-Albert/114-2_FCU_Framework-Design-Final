@@ -7,6 +7,7 @@ export interface Vehicle {
   year: number
   status: string
   createdAt: string
+  currentMileage: number
 }
 
 export const vehiclesApi = {

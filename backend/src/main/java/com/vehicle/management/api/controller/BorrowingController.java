@@ -1,6 +1,7 @@
 package com.vehicle.management.api.controller;
 
 import com.vehicle.management.api.dto.BorrowingResponse;
+import com.vehicle.management.api.dto.CompleteBorrowingRequest;
 import com.vehicle.management.api.dto.ReviewBorrowingRequest;
 import com.vehicle.management.api.dto.SubmitBorrowingRequest;
 import com.vehicle.management.domain.model.User;
@@ -77,7 +78,8 @@ public class BorrowingController {
     }
 
     @PostMapping("/{id}/complete")
-    public BorrowingResponse complete(@PathVariable UUID id) {
-        return BorrowingResponse.from(borrowingService.completeUse(id));
+    public BorrowingResponse complete(@PathVariable UUID id,
+                                       @Valid @RequestBody CompleteBorrowingRequest req) {
+        return BorrowingResponse.from(borrowingService.completeUse(id, req.endMileage()));
     }
 }

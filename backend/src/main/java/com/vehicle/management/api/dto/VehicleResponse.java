@@ -11,10 +11,11 @@ public record VehicleResponse(
         String model,
         int year,
         String status,
-        Instant createdAt
+        Instant createdAt,
+        int currentMileage
 ) {
     public static VehicleResponse from(Vehicle v) {
         return new VehicleResponse(v.getId(), v.getPlate(), v.getModel(),
-                v.getYear(), v.getStatus().name(), v.getCreatedAt());
+                v.getYear(), v.getStatus().name(), v.getCreatedAt(), v.getCurrentMileage());
     }
 }

@@ -11,6 +11,8 @@ export interface BorrowingRequest {
   reviewNote: string | null
   createdAt: string
   updatedAt: string
+  startMileage?: number
+  endMileage?: number
 }
 
 export const borrowingsApi = {
@@ -32,6 +34,6 @@ export const borrowingsApi = {
   startUse: (id: string) =>
     client.post<BorrowingRequest>(`/borrowings/${id}/start`),
 
-  complete: (id: string) =>
-    client.post<BorrowingRequest>(`/borrowings/${id}/complete`),
+  complete: (id: string, endMileage: number) =>
+    client.post<BorrowingRequest>(`/borrowings/${id}/complete`, { endMileage }),
 }
