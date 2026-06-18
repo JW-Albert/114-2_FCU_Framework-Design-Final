@@ -1,0 +1,95 @@
+name: Build & Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. 取得原始碼 ────────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. 建置前端 ──────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # 將 Vite build 的 dist 放進 Spring Boot static 資源目錄，
+      # 這樣 Spring Boot JAR 就能同時供後端 API 和前端 SPA
+      - name: Copy frontend dist into Spring Boot static resources
+        run: |
+          rm -rf backend/src/main/resources/static
+          cp -r frontend/dist backend/src/main/resources/static
+
+      # ── 3. 建置後端 ──────────────────────────────────────────────────
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build backend JAR (skip tests)
+        working-directory: backend
+        run: mvn package -DskipTests --batch-mode --no-transfer-progress
+
+      - name: Rename JAR to fixed filename
+        run: mv backend/target/vehicle-management-*.jar backend/target/app.jar
+
+      # ── 4. 上傳 JAR 到 VPS ───────────────────────────────────────────
+      - name: Upload JAR to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST_ADDRESS }}
+          port: ${{ secrets.HOST_PORT }}
+          username: ${{ secrets.ACCOUNT_NAME }}
+          password: ${{ secrets.ACCOUNT_PASSWORD }}
+          source: backend/target/app.jar
+          target: ~/deploy/
+          strip_components: 2      # backend/target/app.jar → ~/deploy/app.jar
+
+      # ── 5. SSH 重啟服務 ──────────────────────────────────────────────
+      - name: Deploy & restart via PM2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST_ADDRESS }}
+          port: ${{ secrets.HOST_PORT }}
+          username: ${{ secrets.ACCOUNT_NAME }}
+          password: ${{ secrets.ACCOUNT_PASSWORD }}
+          script: |
+            set -e
+
+            # 確保 PM2 已安裝（首次部署才需要）
+            if ! command -v pm2 &> /dev/null; then
+              npm install -g pm2
+            fi
+
+            # 建立 app 目錄並替換 JAR
+            mkdir -p ~/app
+            mv ~/deploy/app.jar ~/app/app.jar
+
+            # 若 PM2 中已有此應用則重啟，否則首次啟動
+            if pm2 describe vehicle-management > /dev/null 2>&1; then
+              pm2 restart vehicle-management --update-env
+            else
+              pm2 start "java -jar $HOME/app/app.jar" \
+                --name vehicle-management \
+                --log $HOME/app/app.log \
+                --time
+            fi
+
+            # 保存 PM2 process list（開機自動重啟用）
+            pm2 save
