@@ -76,6 +76,12 @@ jobs:
             export NPM_CONFIG_PREFIX="$HOME/.npm-global"
             export PATH="$HOME/.npm-global/bin:$PATH"
 
+            # 將路徑永久寫入 ~/.profile（確保登入 VPS 後也能直接用 pm2）
+            if ! grep -q 'npm-global' ~/.profile 2>/dev/null; then
+              echo 'export NPM_CONFIG_PREFIX="$HOME/.npm-global"' >> ~/.profile
+              echo 'export PATH="$HOME/.npm-global/bin:$PATH"'    >> ~/.profile
+            fi
+
             # 確保 PM2 已安裝（首次部署才需要）
             if ! command -v pm2 &> /dev/null; then
               npm install -g pm2
