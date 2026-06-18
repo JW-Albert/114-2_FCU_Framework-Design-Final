@@ -232,6 +232,10 @@ public class BorrowingService extends BorrowingEventPublisher {
 
     /**
      * 取得指定時段內的借車申請（月曆視圖用）。
+     *
+     * @param start 時段開始時間
+     * @param end   時段結束時間
+     * @return 時段內的申請清單（不含已拒絕）
      */
     public List<BorrowingRequest> listInRange(Instant start, Instant end) {
         return borrowingRepo.findInRange(start, end);

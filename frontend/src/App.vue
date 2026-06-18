@@ -4,6 +4,7 @@
       <span class="brand">🚗 車輛管理系統</span>
       <div class="nav-links">
         <template v-if="auth.isAdmin">
+          <router-link to="/admin/dashboard">統計總覽</router-link>
           <router-link to="/admin/review">審核申請</router-link>
           <router-link to="/admin/vehicles">車輛管理</router-link>
           <router-link to="/admin/maintenance">保養管理</router-link>
