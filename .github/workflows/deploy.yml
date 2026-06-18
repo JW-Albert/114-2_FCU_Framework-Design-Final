@@ -13,28 +13,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. 建置前端 ──────────────────────────────────────────────────
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run build
-
-      # 將 Vite build 的 dist 放進 Spring Boot static 資源目錄，
-      # 這樣 Spring Boot JAR 就能同時供後端 API 和前端 SPA
-      - name: Copy frontend dist into Spring Boot static resources
-        run: |
-          rm -rf backend/src/main/resources/static
-          cp -r frontend/dist backend/src/main/resources/static
-
-      # ── 3. 建置後端 ──────────────────────────────────────────────────
+      # ── 2. 建置後端 JAR ──────────────────────────────────────────────
+      #    前端改由 VPS 直接跑 Vite dev server，不再打包進 JAR
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
@@ -49,7 +29,7 @@ jobs:
       - name: Rename JAR to fixed filename
         run: mv backend/target/vehicle-management-*.jar backend/target/app.jar
 
-      # ── 4. 上傳 JAR 到 VPS ───────────────────────────────────────────
+      # ── 3. 上傳 JAR 到 VPS ───────────────────────────────────────────
       - name: Upload JAR to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -61,7 +41,7 @@ jobs:
           target: ~/deploy/
           strip_components: 2      # backend/target/app.jar → ~/deploy/app.jar
 
-      # ── 5. SSH 重啟服務 ──────────────────────────────────────────────
+      # ── 4. SSH：更新前端原始碼並重啟兩個服務 ─────────────────────────
       - name: Deploy & restart via PM2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -72,42 +52,58 @@ jobs:
           script: |
             set -e
 
-            # 將 npm global 安裝路徑改到使用者 home，避免需要 root 權限
+            # ── npm global 路徑（無 sudo） ────────────────────────────
             export NPM_CONFIG_PREFIX="$HOME/.npm-global"
             export PATH="$HOME/.npm-global/bin:$PATH"
 
-            # 將路徑永久寫入 ~/.profile（確保登入 VPS 後也能直接用 pm2）
             if ! grep -q 'npm-global' ~/.profile 2>/dev/null; then
               echo 'export NPM_CONFIG_PREFIX="$HOME/.npm-global"' >> ~/.profile
               echo 'export PATH="$HOME/.npm-global/bin:$PATH"'    >> ~/.profile
             fi
 
-            # 確保 PM2 已安裝（首次部署才需要）
+            # ── 確保 PM2 已安裝 ──────────────────────────────────────
             if ! command -v pm2 &> /dev/null; then
               npm install -g pm2
             fi
 
-            # 建立 app 目錄並替換 JAR
+            # ── 更新前端原始碼（git pull 或首次 clone）───────────────
+            REPO_DIR="$HOME/repo"
+            if [ -d "$REPO_DIR/.git" ]; then
+              git -C "$REPO_DIR" pull origin main
+            else
+              git clone https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final.git "$REPO_DIR"
+            fi
+
+            # 安裝前端相依套件
+            cd "$REPO_DIR/frontend"
+            npm install
+
+            # ── 移動新 JAR ───────────────────────────────────────────
             mkdir -p ~/app
             mv ~/deploy/app.jar ~/app/app.jar
 
-            # 找出 java 完整路徑（PM2 使用最小化環境，不讀 ~/.profile）
+            # ── 找出 java 完整路徑（PM2 不讀 ~/.profile）────────────
             JAVA_BIN=$(which java 2>/dev/null \
-              || find /usr /opt /home -name java -type f 2>/dev/null | grep bin | head -1)
+              || find /usr /opt -name java -type f 2>/dev/null | grep '/bin/java' | head -1)
             if [ -z "$JAVA_BIN" ]; then
               echo "ERROR: java not found on VPS" && exit 1
             fi
-            echo "Using Java: $JAVA_BIN"
-            "$JAVA_BIN" -version
+            echo "Java: $JAVA_BIN ($($JAVA_BIN -version 2>&1 | head -1))"
 
-            # 停止並移除舊 process（確保啟動參數每次都更新）
-            pm2 delete vehicle-management 2>/dev/null || true
-
-            # 以 dev 模式啟動（H2 in-memory DB，無需 PostgreSQL）
+            # ── 重啟後端（port 8080，dev 模式 H2 DB）────────────────
+            pm2 delete vehicle-backend 2>/dev/null || true
             pm2 start "$JAVA_BIN -jar $HOME/app/app.jar --spring.profiles.active=dev" \
-              --name vehicle-management \
-              --log $HOME/app/app.log \
+              --name vehicle-backend \
+              --log $HOME/app/backend.log \
               --time
 
-            # 保存 PM2 process list（開機自動重啟用）
+            # ── 重啟前端（port 5173，Vite dev server）────────────────
+            pm2 delete vehicle-frontend 2>/dev/null || true
+            pm2 start "npm run dev" \
+              --name vehicle-frontend \
+              --cwd "$REPO_DIR/frontend" \
+              --log $HOME/app/frontend.log \
+              --time
+
             pm2 save
+            pm2 list
