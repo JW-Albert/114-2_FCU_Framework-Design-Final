@@ -2,6 +2,22 @@
   <div class="page">
     <h2>借車申請審核</h2>
 
+    <!-- 匯出 Excel 區塊 -->
+    <section class="card export-section">
+      <h3>匯出借用記錄</h3>
+      <div class="export-row">
+        <label class="export-label">從
+          <input v-model="exportFrom" type="date" class="date-input" />
+        </label>
+        <label class="export-label">至
+          <input v-model="exportTo" type="date" class="date-input" />
+        </label>
+        <button class="btn export" @click="handleExport" :disabled="exportLoading">
+          {{ exportLoading ? '匯出中…' : '匯出 Excel' }}
+        </button>
+      </div>
+    </section>
+
     <div class="tabs">
       <button :class="['tab', { active: tab === 'pending' }]" @click="tab = 'pending'">
         待審核 <span class="count">{{ pendingList.length }}</span>
@@ -102,8 +118,12 @@
 import { ref, onMounted } from 'vue'
 import { vehiclesApi } from '../api/vehicles'
 import { borrowingsApi, type BorrowingRequest } from '../api/borrowings'
+import { reportsApi } from '../api/reports'
 
 const tab = ref<'pending' | 'all'>('pending')
+const exportFrom = ref<string>('')
+const exportTo = ref<string>('')
+const exportLoading = ref(false)
 const pendingList = ref<BorrowingRequest[]>([])
 const allRequests = ref<BorrowingRequest[]>([])
 const vehicleMap = ref<Record<string, string>>({})
@@ -169,6 +189,19 @@ async function complete(id: string) {
     alert(e.response?.data?.message ?? '還車失敗')
   } finally {
     actionLoading.value[id] = false
+  }
+}
+
+async function handleExport() {
+  exportLoading.value = true
+  try {
+    const from = exportFrom.value ? new Date(exportFrom.value).toISOString() : undefined
+    const to = exportTo.value ? new Date(exportTo.value + 'T23:59:59').toISOString() : undefined
+    await reportsApi.exportBorrowings(from, to)
+  } catch (e: any) {
+    alert(e.message ?? '匯出失敗，請稍後再試')
+  } finally {
+    exportLoading.value = false
   }
 }
 
@@ -238,4 +271,11 @@ h3 { font-size: 1.05rem; margin-bottom: 1rem; color: #334155; }
 .btn.complete { background: #ede9fe; color: #6d28d9; }
 .btn.complete:hover:not(:disabled) { background: #ddd6fe; }
 .mileage-info { font-size: 0.82rem; color: #475569; }
+.export-section { margin-bottom: 1.25rem; }
+.export-row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+.export-label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: #475569; font-weight: 500; }
+.date-input { padding: 0.45rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; }
+.date-input:focus { outline: none; border-color: #3b82f6; }
+.btn.export { background: #1d4ed8; color: white; }
+.btn.export:hover:not(:disabled) { background: #1e40af; }
 </style>
