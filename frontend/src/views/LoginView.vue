@@ -41,7 +41,9 @@ async function handleLogin() {
   try {
     const { data } = await authApi.login(form.value.email, form.value.password)
     auth.setToken(data.token, data.roles, data.email, data.name, data.department)
-    if (auth.isAdmin || auth.isManager) {
+    if (auth.isAdmin) {
+      router.push('/admin/dashboard')
+    } else if (auth.isManager) {
       router.push('/admin/review')
     } else {
       router.push('/employee/borrow')

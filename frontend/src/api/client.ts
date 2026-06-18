@@ -24,4 +24,5 @@ client.interceptors.response.use(
   },
 )
 
+export { client }
 export default client
