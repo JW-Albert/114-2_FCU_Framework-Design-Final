@@ -6,6 +6,7 @@ import com.vehicle.management.domain.model.Vehicle;
 import com.vehicle.management.domain.model.VehicleStatus;
 import com.vehicle.management.domain.role.RoleFactory;
 import com.vehicle.management.repository.inmemory.InMemoryBorrowingRepository;
+import com.vehicle.management.repository.inmemory.InMemoryUserRepository;
 import com.vehicle.management.repository.inmemory.InMemoryVehicleRepository;
 import com.vehicle.management.service.BorrowingService;
 import com.vehicle.management.service.ConflictException;
@@ -32,7 +33,8 @@ class BorrowingServiceTest {
     void setUp() {
         vehicleRepo = new InMemoryVehicleRepository();
         InMemoryBorrowingRepository borrowingRepo = new InMemoryBorrowingRepository();
-        service = new BorrowingService(borrowingRepo, vehicleRepo);
+        InMemoryUserRepository userRepo = new InMemoryUserRepository();
+        service = new BorrowingService(borrowingRepo, vehicleRepo, userRepo, null);
 
         employee = new User(UUID.randomUUID(), "Alice", "alice@example.com",
                 "hash", Set.of(RoleFactory.create("EMPLOYEE")), Instant.now());
