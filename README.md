@@ -246,16 +246,16 @@ classDiagram
         +hasConflict() : newStart < existEnd AND newEnd > existStart
         -isActiveState(state) boolean
     }
-    class BorrowingService {
+    class TimeConflictValidator {
         -ConflictCheckStrategy conflictStrategy
-        +submitRequest() : if conflictStrategy.hasConflict()...
+        +validate(ctx) : if conflictStrategy.hasConflict()...
     }
 
     ConflictCheckStrategy <|.. StrictOverlapStrategy
-    BorrowingService --> ConflictCheckStrategy : 注入（Spring DI）
+    TimeConflictValidator --> ConflictCheckStrategy : 注入（Spring DI）
 ```
 
-> 未來可引入 Decorator Pattern（#65）在不修改任何現有策略的情況下疊加「緩衝時間」規則。
+> Decorator Pattern（[#65](#8-decorator-pattern--可疊加的衝突緩衝策略65)）可在不修改 `StrictOverlapStrategy` 的情況下疊加「緩衝時間」規則。
 
 ---
 
@@ -398,14 +398,169 @@ classDiagram
 
 ---
 
-## 規劃中的設計模式擴充
+### 6. Builder Pattern — 借車申請物件建構（[#63](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/63)）
 
-| Issue | 模式 | 動機 |
-|-------|------|------|
-| [#63](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/63) | Builder | 重構 `BorrowingRepositoryAdapter.toDomain()` 狀態還原邏輯，避免重播 State transition |
-| [#64](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/64) | Chain of Responsibility | 重構 `submitRequest()` 多步驟驗證，讓新規則以新 Bean 方式加入 |
-| [#65](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/65) | Decorator | `ConflictCheckStrategy` 可疊加「緩衝時間」等規則，不修改現有策略 |
-| [#66](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/66) | Command | 封裝借車生命週期操作，支援稽核日誌與未來異步處理 |
+**問題**：`BorrowingRepositoryAdapter.toDomain()` 從資料庫還原物件時，需呼叫 `r.approve(null); r.startUse();` 等副作用方法重播 State transition，會觸發 Observer 通知且邏輯脆弱。
+
+**解法**：`BorrowingRequest.Builder` 提供 `restoreState(String)` 方法直接設定目標 State 物件，完全繞過 State transition 副作用，使 Adapter 的還原邏輯清晰且安全。
+
+```mermaid
+classDiagram
+    class BorrowingRequest {
+        -BorrowingState state
+        -String reviewNote
+        -Integer startMileage
+        -Integer endMileage
+        +builder(id, userId, vehicleId, ...) Builder$
+        -BorrowingRequest(Builder b)
+    }
+    class Builder {
+        +reviewNote(note) Builder
+        +updatedAt(t) Builder
+        +startMileage(km) Builder
+        +endMileage(km) Builder
+        +restoreState(stateName) Builder
+        +build() BorrowingRequest
+    }
+    class BorrowingRepositoryAdapter {
+        +toDomain(entity) BorrowingRequest
+    }
+
+    BorrowingRequest +-- Builder
+    BorrowingRepositoryAdapter ..> Builder : 使用 Builder 還原狀態
+```
+
+> `toDomain()` 舊寫法：`r.approve(null); r.startUse();`（重播副作用）
+> 新寫法：`.restoreState("IN_USE").reviewNote(...).build()`（直接設定，無副作用）
+
+---
+
+### 7. Chain of Responsibility Pattern — 借車申請多步驟驗證（[#64](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/64)）
+
+**問題**：`BorrowingService.submitRequest()` 依序進行「權限檢查 → 車輛存在 → 時段衝突」三步驗證，邏輯全寫在一個方法中，新增驗證規則需修改 Service 本身（違反 OCP）。
+
+**解法**：三個驗證步驟各自實作 `BorrowingValidator`（`@Component @Order`），Spring 依 `@Order` 排序後注入 `List<BorrowingValidator>`，`submitRequest()` 只需 `validators.forEach(v -> v.validate(ctx))`。
+
+```mermaid
+classDiagram
+    class BorrowingValidator {
+        <<interface>>
+        +validate(ctx BorrowingValidationContext)
+    }
+    class BorrowingValidationContext {
+        <<record>>
+        +actor User
+        +vehicleId UUID
+        +periodStart Instant
+        +periodEnd Instant
+    }
+    class PermissionValidator {
+        +validate(ctx) : 檢查 SUBMIT_REQUEST 權限
+    }
+    class VehicleExistenceValidator {
+        +validate(ctx) : 確認車輛存在
+    }
+    class TimeConflictValidator {
+        -IBorrowingRepository borrowingRepo
+        -ConflictCheckStrategy conflictStrategy
+        +validate(ctx) : 以策略檢查時段衝突
+    }
+    class BorrowingService {
+        -List~BorrowingValidator~ validators
+        +submitRequest() : validators.forEach(v→v.validate(ctx))
+    }
+
+    BorrowingValidator <|.. PermissionValidator
+    BorrowingValidator <|.. VehicleExistenceValidator
+    BorrowingValidator <|.. TimeConflictValidator
+    BorrowingService --> BorrowingValidator : Spring 注入責任鏈
+    TimeConflictValidator --> ConflictCheckStrategy : 委派演算法
+```
+
+> 新增驗證規則（例如「同一員工每月申請不超過 5 次」）只需新增一個 `@Component @Order` 的 `BorrowingValidator` 實作，無需修改 `BorrowingService`（OCP）。
+
+---
+
+### 8. Decorator Pattern — 可疊加的衝突緩衝策略（[#65](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/65)）
+
+**問題**：若需在現有嚴格重疊策略上加入「借車前後保留 30 分鐘緩衝時間」的規則，直接修改 `StrictOverlapStrategy` 會使其邏輯複雜，且難以在不同情境下選擇是否啟用緩衝。
+
+**解法**：`BufferedOverlapDecorator` 包裝任意 `ConflictCheckStrategy`，在委派前後延伸時段，不修改被包裝的策略（OCP）。透過 Spring `@Bean @Primary` 可選擇性啟用。
+
+```mermaid
+classDiagram
+    class ConflictCheckStrategy {
+        <<interface>>
+        +hasConflict(existing, start, end) boolean
+    }
+    class StrictOverlapStrategy {
+        +hasConflict() : newStart < existEnd AND newEnd > existStart
+    }
+    class BufferedOverlapDecorator {
+        -ConflictCheckStrategy inner
+        -Duration buffer
+        +hasConflict(existing, start, end) : inner.hasConflict(start-buffer, end+buffer)
+    }
+
+    ConflictCheckStrategy <|.. StrictOverlapStrategy
+    ConflictCheckStrategy <|.. BufferedOverlapDecorator
+    BufferedOverlapDecorator --> ConflictCheckStrategy : 委派（裝飾）
+```
+
+> 啟用緩衝：在 Spring 設定類別宣告 `@Bean @Primary ConflictCheckStrategy buffered(StrictOverlapStrategy base) { return new BufferedOverlapDecorator(base, Duration.ofMinutes(30)); }`
+
+---
+
+### 9. Command Pattern — 借車狀態操作稽核（[#66](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/66)）
+
+**問題**：`BorrowingController` 直接呼叫 `borrowingService.approveRequest(...)` 等方法，各操作的稽核日誌、非同步處理等橫切關注點分散在各 endpoint，無法統一管理。
+
+**解法**：每個狀態變更操作封裝為 `BorrowingCommand`（`ApproveCommand`、`RejectCommand`、`StartUseCommand`、`CompleteCommand`），由 `BorrowingCommandBus`（Invoker）統一執行並記錄稽核日誌。
+
+```mermaid
+classDiagram
+    class BorrowingCommand {
+        <<interface>>
+        +execute() BorrowingRequest
+        +describe() String
+    }
+    class ApproveCommand {
+        -User actor
+        -UUID requestId
+        -String note
+        +execute() : service.approveRequest(actor, id, note)
+        +describe() : "ApproveCommand[...]"
+    }
+    class RejectCommand {
+        +execute() : service.rejectRequest(...)
+    }
+    class StartUseCommand {
+        +execute() : service.startUse(...)
+    }
+    class CompleteCommand {
+        -int endMileage
+        +execute() : service.completeUse(...)
+    }
+    class BorrowingCommandBus {
+        +dispatch(cmd) : log audit → cmd.execute()
+    }
+    class BorrowingController {
+        -BorrowingCommandBus commandBus
+        +approve() : commandBus.dispatch(new ApproveCommand(...))
+        +reject() : commandBus.dispatch(new RejectCommand(...))
+        +startUse() : commandBus.dispatch(new StartUseCommand(...))
+        +complete() : commandBus.dispatch(new CompleteCommand(...))
+    }
+
+    BorrowingCommand <|.. ApproveCommand
+    BorrowingCommand <|.. RejectCommand
+    BorrowingCommand <|.. StartUseCommand
+    BorrowingCommand <|.. CompleteCommand
+    BorrowingCommandBus --> BorrowingCommand : dispatch() → execute()
+    BorrowingController --> BorrowingCommandBus : 使用
+```
+
+> `BorrowingCommandBus.dispatch()` 目前記錄 `[AUDIT]` 稽核日誌；未來可在此加入命令佇列、重試、非同步執行，無需修改任何 Command 實作（OCP）。
 
 ---
 

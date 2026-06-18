@@ -1,7 +1,11 @@
 package com.vehicle.management.domain.model;
 
+import com.vehicle.management.domain.state.ApprovedState;
 import com.vehicle.management.domain.state.BorrowingState;
+import com.vehicle.management.domain.state.InUseState;
 import com.vehicle.management.domain.state.PendingState;
+import com.vehicle.management.domain.state.RejectedState;
+import com.vehicle.management.domain.state.ReturnedState;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -44,14 +48,6 @@ public class BorrowingRequest {
 
     /**
      * 建構新的借車申請，初始狀態為 {@link PendingState}（待審核）。
-     *
-     * @param id          申請單唯一識別碼
-     * @param userId      申請人的使用者 ID
-     * @param vehicleId   欲借用的車輛 ID
-     * @param periodStart 借車開始時間
-     * @param periodEnd   借車結束時間
-     * @param purpose     借車事由說明
-     * @param createdAt   申請建立時間
      */
     public BorrowingRequest(UUID id, UUID userId, UUID vehicleId,
                             Instant periodStart, Instant periodEnd,
@@ -62,9 +58,90 @@ public class BorrowingRequest {
         this.periodStart = periodStart;
         this.periodEnd = periodEnd;
         this.purpose = purpose;
-        this.state = new PendingState();  // 初始狀態：待審核
+        this.state = new PendingState();
         this.createdAt = createdAt;
         this.updatedAt = createdAt;
+    }
+
+    /** Builder Pattern 專用私有建構子，直接設定所有欄位（含狀態），不重播轉換。 */
+    private BorrowingRequest(Builder b) {
+        this.id = b.id;
+        this.userId = b.userId;
+        this.vehicleId = b.vehicleId;
+        this.periodStart = b.periodStart;
+        this.periodEnd = b.periodEnd;
+        this.purpose = b.purpose;
+        this.state = b.state;
+        this.reviewNote = b.reviewNote;
+        this.createdAt = b.createdAt;
+        this.updatedAt = b.updatedAt != null ? b.updatedAt : b.createdAt;
+        this.startMileage = b.startMileage;
+        this.endMileage = b.endMileage;
+    }
+
+    /** 建立 Builder，適用於從持久層還原借車申請（Builder Pattern, GoF Ch3）。 */
+    public static Builder builder(UUID id, UUID userId, UUID vehicleId,
+                                  Instant periodStart, Instant periodEnd,
+                                  String purpose, Instant createdAt) {
+        return new Builder(id, userId, vehicleId, periodStart, periodEnd, purpose, createdAt);
+    }
+
+    /**
+     * Builder（GoF Builder Pattern）。
+     *
+     * <p>解決 {@link BorrowingRepositoryAdapter} 從 DB 還原物件時需重播狀態轉換的問題：
+     * 只需呼叫 {@link #restoreState(String)} 即可直接設定目標狀態，
+     * 避免呼叫 {@code approve(null)} 等副作用方法。</p>
+     */
+    public static final class Builder {
+        private final UUID id;
+        private final UUID userId;
+        private final UUID vehicleId;
+        private final Instant periodStart;
+        private final Instant periodEnd;
+        private final String purpose;
+        private final Instant createdAt;
+
+        private BorrowingState state = new PendingState();
+        private String reviewNote;
+        private Instant updatedAt;
+        private Integer startMileage;
+        private Integer endMileage;
+
+        private Builder(UUID id, UUID userId, UUID vehicleId,
+                        Instant periodStart, Instant periodEnd,
+                        String purpose, Instant createdAt) {
+            this.id = id;
+            this.userId = userId;
+            this.vehicleId = vehicleId;
+            this.periodStart = periodStart;
+            this.periodEnd = periodEnd;
+            this.purpose = purpose;
+            this.createdAt = createdAt;
+        }
+
+        public Builder reviewNote(String note)   { this.reviewNote = note; return this; }
+        public Builder updatedAt(Instant t)      { this.updatedAt = t; return this; }
+        public Builder startMileage(Integer km)  { this.startMileage = km; return this; }
+        public Builder endMileage(Integer km)    { this.endMileage = km; return this; }
+
+        /**
+         * 直接還原為指定狀態，不觸發任何副作用（轉換記錄、Observer 通知等）。
+         *
+         * @param stateName DB 中儲存的狀態字串（PENDING / APPROVED / REJECTED / IN_USE / RETURNED）
+         */
+        public Builder restoreState(String stateName) {
+            this.state = switch (stateName != null ? stateName : "PENDING") {
+                case "APPROVED" -> new ApprovedState();
+                case "REJECTED" -> new RejectedState();
+                case "IN_USE"   -> new InUseState();
+                case "RETURNED" -> new ReturnedState();
+                default         -> new PendingState();
+            };
+            return this;
+        }
+
+        public BorrowingRequest build() { return new BorrowingRequest(this); }
     }
 
     /**
@@ -173,14 +250,4 @@ public class BorrowingRequest {
     /** @return 還車時的結束里程（可能為 {@code null}） */
     public Integer getEndMileage() { return endMileage; }
 
-    /**
-     * 由 Adapter 呼叫，從資料庫還原里程資料。
-     *
-     * @param startMileage 起始里程
-     * @param endMileage   結束里程
-     */
-    public void restoreMileage(Integer startMileage, Integer endMileage) {
-        this.startMileage = startMileage;
-        this.endMileage = endMileage;
-    }
 }
