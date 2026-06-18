@@ -91,11 +91,20 @@ jobs:
             mkdir -p ~/app
             mv ~/deploy/app.jar ~/app/app.jar
 
+            # 找出 java 完整路徑（PM2 使用最小化環境，不讀 ~/.profile）
+            JAVA_BIN=$(which java 2>/dev/null \
+              || find /usr /opt /home -name java -type f 2>/dev/null | grep bin | head -1)
+            if [ -z "$JAVA_BIN" ]; then
+              echo "ERROR: java not found on VPS" && exit 1
+            fi
+            echo "Using Java: $JAVA_BIN"
+            "$JAVA_BIN" -version
+
             # 停止並移除舊 process（確保啟動參數每次都更新）
             pm2 delete vehicle-management 2>/dev/null || true
 
             # 以 dev 模式啟動（H2 in-memory DB，無需 PostgreSQL）
-            pm2 start "java -jar $HOME/app/app.jar --spring.profiles.active=dev" \
+            pm2 start "$JAVA_BIN -jar $HOME/app/app.jar --spring.profiles.active=dev" \
               --name vehicle-management \
               --log $HOME/app/app.log \
               --time
