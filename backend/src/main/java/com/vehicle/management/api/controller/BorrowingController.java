@@ -2,17 +2,23 @@ package com.vehicle.management.api.controller;
 
 import com.vehicle.management.api.dto.BorrowingResponse;
 import com.vehicle.management.api.dto.CompleteBorrowingRequest;
+import com.vehicle.management.api.dto.ConflictCheckResponse;
 import com.vehicle.management.api.dto.ReviewBorrowingRequest;
 import com.vehicle.management.api.dto.SubmitBorrowingRequest;
+import com.vehicle.management.domain.model.BorrowingRequest;
 import com.vehicle.management.domain.model.User;
 import com.vehicle.management.service.BorrowingService;
 import com.vehicle.management.service.UserService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.format.annotation.DateTimeFormat.ISO;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -81,5 +87,17 @@ public class BorrowingController {
     public BorrowingResponse complete(@PathVariable UUID id,
                                        @Valid @RequestBody CompleteBorrowingRequest req) {
         return BorrowingResponse.from(borrowingService.completeUse(id, req.endMileage()));
+    }
+
+    @GetMapping("/conflict-check")
+    public ResponseEntity<ConflictCheckResponse> checkConflict(
+            @RequestParam UUID vehicleId,
+            @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) Instant start,
+            @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) Instant end,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        List<BorrowingRequest> conflicts = borrowingService.findConflicts(vehicleId, start, end);
+        return ResponseEntity.ok(new ConflictCheckResponse(
+                !conflicts.isEmpty(),
+                conflicts.stream().map(BorrowingResponse::from).toList()));
     }
 }

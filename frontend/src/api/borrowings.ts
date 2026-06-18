@@ -15,6 +15,11 @@ export interface BorrowingRequest {
   endMileage?: number
 }
 
+export interface ConflictCheckResult {
+  hasConflict: boolean
+  conflicts: BorrowingRequest[]
+}
+
 export const borrowingsApi = {
   submit: (vehicleId: string, periodStart: string, periodEnd: string, purpose: string) =>
     client.post<BorrowingRequest>('/borrowings', { vehicleId, periodStart, periodEnd, purpose }),
@@ -36,4 +41,9 @@ export const borrowingsApi = {
 
   complete: (id: string, endMileage: number) =>
     client.post<BorrowingRequest>(`/borrowings/${id}/complete`, { endMileage }),
+
+  checkConflict: (vehicleId: string, start: string, end: string) =>
+    client.get<ConflictCheckResult>('/borrowings/conflict-check', {
+      params: { vehicleId, start, end }
+    }).then(r => r.data),
 }
