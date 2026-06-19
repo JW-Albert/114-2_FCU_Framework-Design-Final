@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公司車輛管理系統 — 10 分鐘報告講稿</title>
+<style>
+  :root {
+    --base: 17px;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --ink: #1e293b;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --brand: #3b82f6;
+    --hl-bg: #fef3c7;
+    --hl-ink: #92400e;
+    --code-bg: #f1f5f9;
+    --code-ink: #0f172a;
+    --maxw: 820px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: var(--base);
+    line-height: 1.85;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 頂部閱讀進度 */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 4px; width: 0%;
+    background: linear-gradient(90deg, #6366f1, #3b82f6, #06b6d4);
+    z-index: 100; transition: width .1s linear;
+  }
+
+  /* 工具列 */
+  .toolbar {
+    position: fixed; top: 14px; right: 16px; z-index: 90;
+    display: flex; gap: 6px; align-items: center;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(6px);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 8px; box-shadow: 0 2px 12px rgba(0,0,0,.07);
+  }
+  .toolbar button {
+    border: none; background: #f1f5f9; color: var(--ink);
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    font-size: 14px; font-weight: 700; transition: background .15s;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .toolbar button:hover { background: #e2e8f0; }
+  .toolbar .label { font-size: 12px; color: var(--muted); padding: 0 4px; }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px 80px; }
+
+  /* 封面 */
+  header.cover {
+    text-align: center; padding: 72px 20px 36px;
+  }
+  header.cover .kicker { color: var(--brand); font-weight: 700; letter-spacing: 2px; font-size: 14px; }
+  header.cover h1 { font-size: 2.1rem; margin: 12px 0 6px; letter-spacing: 1px; }
+  header.cover .sub { color: var(--muted); font-size: 1rem; }
+  .meta {
+    display: inline-flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+    margin-top: 22px;
+  }
+  .meta span {
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 16px; font-size: .85rem; color: var(--muted);
+  }
+  .meta strong { color: var(--ink); }
+
+  /* 章節目錄 */
+  nav.toc {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(241,245,249,.93); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  nav.toc .toc-inner {
+    max-width: var(--maxw); margin: 0 auto; padding: 10px 20px;
+    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin;
+  }
+  nav.toc a {
+    white-space: nowrap; text-decoration: none; color: var(--muted);
+    font-size: .82rem; padding: 5px 11px; border-radius: 7px; transition: all .15s;
+    border: 1px solid transparent;
+  }
+  nav.toc a:hover { color: var(--ink); background: #e2e8f0; }
+  nav.toc a.active { color: #fff; background: var(--brand); }
+
+  /* 章節 */
+  .chapter { margin-bottom: 40px; scroll-margin-top: 64px; }
+  .chapter-head {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding-left: 14px; border-left: 5px solid var(--accent, var(--brand));
+    margin-bottom: 16px;
+  }
+  .chapter-head .time {
+    font-variant-numeric: tabular-nums; font-size: .8rem; font-weight: 700;
+    color: #fff; background: var(--accent, var(--brand));
+    padding: 3px 10px; border-radius: 999px;
+  }
+  .chapter-head h2 { font-size: 1.22rem; line-height: 1.4; }
+
+  /* 講稿卡片 */
+  .slide {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 22px; margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .slide-no {
+    display: inline-block; font-size: .72rem; font-weight: 800; letter-spacing: 1px;
+    color: var(--accent, var(--brand)); border: 1.5px solid var(--accent, var(--brand));
+    border-radius: 6px; padding: 2px 9px; margin-bottom: 4px;
+  }
+  .slide h3 { font-size: 1.05rem; margin: 8px 0 8px; }
+  .slide p { margin-bottom: 10px; }
+  .slide p:last-child { margin-bottom: 0; }
+  strong { color: var(--hl-ink); background: var(--hl-bg); padding: 1px 5px; border-radius: 4px; font-weight: 700; }
+  code {
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    background: var(--code-bg); color: var(--code-ink);
+    padding: 1px 6px; border-radius: 5px; font-size: .85em;
+  }
+
+  /* 節奏提醒 */
+  .tips {
+    background: linear-gradient(135deg, #fffbeb, #fef9c3);
+    border: 1px solid #fde68a; border-radius: 12px; padding: 20px 24px;
+    margin-top: 30px;
+  }
+  .tips h2 { font-size: 1.1rem; color: #92400e; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .tips ul { padding-left: 4px; list-style: none; }
+  .tips li { margin-bottom: 10px; padding-left: 22px; position: relative; }
+  .tips li::before { content: "⏱"; position: absolute; left: 0; }
+  .tips strong { background: #fde68a; color: #78350f; }
+
+  footer {
+    text-align: center; color: var(--muted); font-size: .8rem;
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line);
+  }
+  footer a { color: var(--brand); text-decoration: none; }
+
+  /* 回到頂部 */
+  #toTop {
+    position: fixed; bottom: 22px; right: 22px; z-index: 80;
+    width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--brand); color: #fff; font-size: 20px;
+    box-shadow: 0 4px 14px rgba(59,130,246,.4); opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+  }
+  #toTop.show { opacity: 1; pointer-events: auto; }
+
+  @media (max-width: 600px) {
+    header.cover h1 { font-size: 1.6rem; }
+    .chapter-head h2 { font-size: 1.05rem; }
+    .toolbar { top: auto; bottom: 22px; left: 22px; right: auto; }
+  }
+
+  @media print {
+    #progress, .toolbar, nav.toc, #toTop { display: none !important; }
+    body { background: #fff; font-size: 12pt; line-height: 1.6; }
+    .slide, .tips { box-shadow: none; break-inside: avoid; }
+    .chapter { break-inside: avoid-page; }
+    strong { background: none; color: #000; text-decoration: underline; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="toolbar">
+  <span class="label">字級</span>
+  <button id="fontMinus" title="縮小字級">A−</button>
+  <button id="fontPlus" title="放大字級">A+</button>
+  <button id="printBtn" title="列印 / 匯出 PDF">🖨</button>
+</div>
+
+<header class="cover">
+  <div class="kicker">114-2 軟體框架設計 · 期末專題</div>
+  <h1>公司車輛管理系統</h1>
+  <div class="sub">10 分鐘報告講稿 · 演講提詞</div>
+  <div class="meta">
+    <span>⏱ 總時長 <strong>約 10 分鐘</strong></span>
+    <span>👥 王建葦 · 陳稚翔</span>
+    <span>🎯 OOD 原則 + 10 個 GoF 設計模式</span>
+  </div>
+  <div class="meta" style="margin-top:10px">
+    <span>分工建議：王建葦講 <strong>封面～架構（1–5）</strong>、陳稚翔講 <strong>模式～結語（6–22）</strong>，或自行對調</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="toc-inner">
+    <a href="#sec1">開場</a>
+    <a href="#sec2">系統全貌</a>
+    <a href="#sec3">模式總覽</a>
+    <a href="#sec4">行為型三模式</a>
+    <a href="#sec5">其餘三模式</a>
+    <a href="#sec6">四個重構模式</a>
+    <a href="#sec7">工作流程</a>
+    <a href="#sec8">收斂</a>
+    <a href="#sec9">結語</a>
+    <a href="#tips">節奏提醒</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section class="chapter" id="sec1" style="--accent:#6366f1">
+    <div class="chapter-head">
+      <span class="time">00:00–01:15</span>
+      <h2>🎬 開場 ｜ 封面 + 動機</h2>
+    </div>
+    <article class="slide">
+      <span class="slide-no">第 1 頁 · 封面</span>
+      <p>大家好，我們這組要報告的是「公司車輛管理系統」。</p>
+      <p>先說明一下重點：這份報告的核心不是功能有多少，而是我們<strong>如何用物件導向設計原則，加上十個 GoF 設計模式</strong>，把一個會不斷擴充的系統，設計得<strong>可維護、可測試、可替換</strong>。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 2 頁 · 動機</span>
+      <p>為什麼要做這個系統？企業車輛常用紙本或 Excel 借用，有三個痛點：第一，<strong>時段衝突</strong>往往事後才發現；第二，申請到還車的<strong>審核軌跡不透明</strong>；而最關鍵的第三點是<strong>難以擴充</strong>——通知方式跟衝突規則全寫死了，改一處就動全身。</p>
+      <p>最後這一點，正是設計模式要解決的問題，也是整份報告的主軸。</p>
+    </article>
+  </section>
+
+  <section class="chapter" id="sec2" style="--accent:#3b82f6">
+    <div class="chapter-head">
+      <span class="time">01:15–03:15</span>
+      <h2>🗺 系統全貌 ｜ 概觀 + 技術 + 架構</h2>
+    </div>
+    <article class="slide">
+      <span class="slide-no">第 3 頁 · 系統概觀</span>
+      <p>系統核心是一條借車工作流程：員工送出申請，進入 <code>PENDING</code>；管理員核准或拒絕；核准後標記出車，進入 <code>IN_USE</code>；最後還車。</p>
+      <p>圍繞這條主線有六大模組——認證、車輛、借車、審核、保養、違規。角色分管理員、主管、員工三種，其中<strong>主管只能審核同部門員工的申請</strong>。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 4 頁 · 技術選型</span>
+      <p>技術上是 <strong>Spring Boot 3 加 Vue 3</strong> 的全棧架構。後端 Java 21、Spring Security 配 JWT 做無狀態認證、JPA 加 Flyway 管資料庫；前端 Vue 3 配 TypeScript 跟 Pinia。部署用 GitHub Actions、PM2 跟 Cloudflare Tunnel。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 5 頁 · 分層架構</span>
+      <p>架構分五層，<strong>重點在中間這條 Repository 介面層——它是依賴反轉的邊界</strong>。</p>
+      <p>上面的 Service 與 Domain 只依賴介面，下面的 Infrastructure 用 JPA Adapter 去實作它們。也就是說，底層的持久化細節在編譯期被反轉掉，<strong>上層完全不感知 JPA 的存在</strong>，因此能脫離資料庫獨立測試。</p>
+    </article>
+  </section>
+
+  <section class="chapter" id="sec3" style="--accent:#0ea5e9">
+    <div class="chapter-head">
+      <span class="time">03:15–04:15</span>
+      <h2>🧩 設計模式總覽 + 領域模型</h2>
+    </div>
+    <article class="slide">
+      <span class="slide-no">第 6 頁 · 模式總覽</span>
+      <p>接下來是報告的重點。我們實作了<strong>十個 GoF 設計模式</strong>，涵蓋行為型、創建型、結構型三大類，其中<strong>四個是後期用來重構既有設計的</strong>。</p>
+      <p>每一個模式都對應一個真實的擴充痛點，<strong>不是為了用而用</strong>。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 7 頁 · 領域模型</span>
+      <p>這張類別圖是整個領域模型的全貌，幾個模式同時交會在這裡：右邊 <code>BorrowingRequest</code> 持有狀態介面，是 State；左邊 <code>RoleFactory</code> 建立角色，是 Factory；最右邊的 Publisher 與 Observer 則是 Observer 模式。先有個印象，接下來逐一拆解。</p>
+    </article>
+  </section>
+
+  <section class="chapter" id="sec4" style="--accent:#06b6d4">
+    <div class="chapter-head">
+      <span class="time">04:15–05:45</span>
+      <h2>⚙️ 行為型三模式 ｜ State · Observer · Strategy</h2>
+    </div>
+    <article class="slide">
+      <span class="slide-no">第 8 頁 · State</span>
+      <p>第一個是 <strong>State</strong>。借車申請有五種狀態，每種只允許特定轉換。如果用 if-else 判斷狀態字串，Service 會充滿分支。</p>
+      <p>解法是讓 <code>BorrowingRequest</code> 當 Context，把每種狀態的轉換邏輯封裝在各自的 ConcreteState。<strong>非法轉換</strong>——比方對已還車的申請再核准——會拋例外回 HTTP 422。<strong>新增狀態只要加一個類別，不改 Context</strong>。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 9 頁 · Observer</span>
+      <p>第二個是 <strong>Observer</strong>。狀態變更要通知人，但通知方式不該寫死在 Service 裡。</p>
+      <p>解法是 Service 只負責發事件，Spring 自動注入所有 Observer。<strong>最棒的是，要新增一個通知管道，只要實作介面再標記 <code>@Component</code>，完全不用改任何現有程式碼——這就是開放封閉原則。</strong></p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 10 頁 · Strategy</span>
+      <p>第三個是 <strong>Strategy</strong>。衝突判斷的演算法有很多種——嚴格重疊、寬鬆同日、加緩衝。寫死在 Service，換邏輯就得改 Service 本身。</p>
+      <p>解法是抽成 <code>ConflictCheckStrategy</code> 介面，透過 Spring 注入。<strong>換策略只要換一個 <code>@Bean</code> 設定，Service 完全不動。</strong></p>
+    </article>
+  </section>
+
+  <section class="chapter" id="sec5" style="--accent:#14b8a6">
+    <div class="chapter-head">
+      <span class="time">05:45–06:45</span>
+      <h2>🛠 其餘模式 ｜ Template Method · Factory · Adapter</h2>
+    </div>
+    <article class="slide">
+      <span class="slide-no">第 11 頁 · Template Method</span>
+      <p>第四個是 <strong>Template Method</strong>。每個 Service 的 public 方法都以相同的權限檢查開頭，違反 DRY。</p>
+      <p>解法是抽象基類定義「<strong>先驗證、後執行</strong>」的骨架，子類只用 lambda 提供業務邏輯，權限跟稽核集中在一處。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 12 頁 · Factory Method</span>
+      <p>第五個是 <strong>Factory Method</strong>。需要依字串建立 Role 物件，直接 new 會產生對具體類別的依賴。</p>
+      <p>改用 <code>RoleFactory</code> 集中建立，呼叫端只依賴介面。<strong>新增角色，例如後來加的主管，只要加一個類別跟一行 case。</strong></p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 13 頁 · Adapter</span>
+      <p>第六個是 <strong>Adapter</strong>。Domain 定義了領域介面，但持久化用 JPA，兩者介面不相容。</p>
+      <p>每個 Adapter 實作 Domain 介面，內部委派 JPA，透過雙向轉換橋接。<strong>Service 完全不感知 JPA，五個 Adapter 結構都相同。</strong></p>
+    </article>
+  </section>
+
+  <section class="chapter" id="sec6" style="--accent:#10b981">
+    <div class="chapter-head">
+      <span class="time">06:45–08:15</span>
+      <h2>🔧 四個重構模式 ｜ Builder · Chain · Decorator · Command</h2>
+    </div>
+    <article class="slide" style="background:#f0fdf4;border-color:#bbf7d0">
+      <p style="margin:0;color:#15803d">接下來這四個，是我們<strong style="background:#bbf7d0;color:#14532d">後期專門用來重構、消除痛點</strong>的模式。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 14 頁 · Builder</span>
+      <p>第七個 <strong>Builder</strong>：從資料庫還原物件時，舊做法要重播 <code>approve</code>、<code>startUse</code> 這些<strong>有副作用</strong>的方法，會觸發通知、邏輯也脆弱。新做法用 Builder 的 <code>restoreState</code> 直接設定目標狀態，<strong>繞過所有副作用</strong>。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 15 頁 · Chain of Responsibility</span>
+      <p>第八個 <strong>責任鏈</strong>：送審要做權限、車輛存在、時段衝突三步驗證，原本全擠在一個方法。改成三個獨立 Validator，用 <code>@Order</code> 排序，Service 只 forEach 逐一呼叫。<strong>新增規則只要加一個 Validator。</strong></p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 16 頁 · Decorator</span>
+      <p>第九個 <strong>Decorator</strong>：想在嚴格策略上加「前後保留 30 分鐘緩衝」，直接改會讓邏輯複雜。改用 Decorator 包裝任意策略，在委派前後延伸時段，<strong>完全不改被包裝的策略</strong>，還能選擇性啟用。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 17 頁 · Command</span>
+      <p>第十個 <strong>Command</strong>：Controller 直接呼叫 Service，稽核、非同步這些橫切關注點散在各處。我們把每個狀態操作封裝成 Command，由 CommandBus 統一執行並記稽核日誌。<strong>未來要加佇列、重試、非同步，都只改 CommandBus。</strong></p>
+    </article>
+  </section>
+
+  <section class="chapter" id="sec7" style="--accent:#22c55e">
+    <div class="chapter-head">
+      <span class="time">08:15–08:55</span>
+      <h2>🔗 工作流程整合</h2>
+    </div>
+    <article class="slide">
+      <span class="slide-no">第 18 頁 · 工作流程</span>
+      <p>這頁把完整流程依生命週期拆成四個階段，<strong>看模式如何協作</strong>：</p>
+      <p>階段一送出申請，走責任鏈三步驗證，再用 State 建立 Pending；階段二審核，用 Command 封裝、State 轉換、Observer 發 Email，主管還多一道同部門檢查；階段三、四的出車跟還車是同樣三模式協作，而<strong>還車若逾時，會自動建立違規記錄</strong>。</p>
+    </article>
+  </section>
+
+  <section class="chapter" id="sec8" style="--accent:#f59e0b">
+    <div class="chapter-head">
+      <span class="time">08:55–09:40</span>
+      <h2>📐 收斂 ｜ 原則 + 測試 + 部署</h2>
+    </div>
+    <article class="slide">
+      <span class="slide-no">第 19 頁 · OOD 原則</span>
+      <p>把模式背後的原則收斂一下：SOLID 五原則加上迪米特法則跟 DRY，都落在系統的<strong>具體位置</strong>——OCP 是三個模式的擴充免改、DIP 是 Repository 介面、DRY 是抽象權限守衛，並且全程<strong>組合優於繼承</strong>。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 20 頁 · 測試策略</span>
+      <p>測試分兩層：單元測試用 InMemory Repository，不碰資料庫、毫秒級跑完，<strong>這正是依賴反轉帶來的可測試性</strong>；整合測試用 WebMvcTest 測 HTTP 層，涵蓋狀態碼、JWT 守衛，以及 401 跟 403。</p>
+    </article>
+    <article class="slide">
+      <span class="slide-no">第 21 頁 · CI/CD</span>
+      <p>部署是全自動的：推送 <code>v</code> 開頭的 tag 觸發 GitHub Actions，建置、上傳、PM2 重啟，最後經 Cloudflare Tunnel 對外。刻意只用 tag 觸發，<strong>精準控制部署時機</strong>。</p>
+    </article>
+  </section>
+
+  <section class="chapter" id="sec9" style="--accent:#8b5cf6">
+    <div class="chapter-head">
+      <span class="time">09:40–10:00</span>
+      <h2>🎓 結語</h2>
+    </div>
+    <article class="slide">
+      <span class="slide-no">第 22 頁 · 結語</span>
+      <p>最後總結。我們實作了十個 GoF 模式，其中四個用於重構、消除痛點。後續還能擴充簡訊或 Line 通知、命令佇列等等。</p>
+      <p>三個收穫：<strong>第一，十個模式都對應真實痛點，不是為用而用；第二，OOD 原則貫穿分層架構；第三，介面與 DIP 讓系統可測試、可替換、可擴充。</strong></p>
+      <p>以上是我們的報告，謝謝聆聽！</p>
+    </article>
+  </section>
+
+  <section class="tips" id="tips">
+    <h2>📌 節奏提醒</h2>
+    <ul>
+      <li>模式頁（8–17）是分數重點但最容易超時——每頁<strong>控制在 50 秒內</strong>，口訣「<strong>一句痛點 → 一句解法 → 一句好處</strong>」。</li>
+      <li>若時間吃緊，第 11–13 頁可各砍到 20 秒，或合併帶過。</li>
+      <li>演示網址 <code>demo.jw-albert.dev</code> 如要現場 demo，建議放在結語前或結語後，另抓 1–2 分鐘（會超出 10 分鐘，需取捨）。</li>
+    </ul>
+  </section>
+
+  <footer>
+    公司車輛管理系統 · 報告講稿 ｜ 線上演示：<a href="https://demo.jw-albert.dev" target="_blank" rel="noopener">demo.jw-albert.dev</a>
+  </footer>
+</main>
+
+<button id="toTop" title="回到頂部">↑</button>
+
+<script>
+  // 閱讀進度條
+  const progress = document.getElementById('progress');
+  const toTop = document.getElementById('toTop');
+  function onScroll() {
+    const h = document.documentElement;
+    const scrolled = h.scrollTop / (h.scrollHeight - h.clientHeight);
+    progress.style.width = (scrolled * 100) + '%';
+    toTop.classList.toggle('show', h.scrollTop > 400);
+  }
+  document.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // 回到頂部
+  toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+  // 字級調整（記憶於 localStorage）
+  const root = document.documentElement;
+  const KEY = 'speech-font-size';
+  let size = parseInt(localStorage.getItem(KEY) || '17', 10);
+  function applySize() { root.style.setProperty('--base', size + 'px'); localStorage.setItem(KEY, size); }
+  applySize();
+  document.getElementById('fontPlus').addEventListener('click', () => { size = Math.min(size + 1, 24); applySize(); });
+  document.getElementById('fontMinus').addEventListener('click', () => { size = Math.max(size - 1, 13); applySize(); });
+
+  // 列印
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+  // 目錄 scrollspy
+  const links = Array.from(document.querySelectorAll('nav.toc a'));
+  const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = map.get(e.target.id);
+        if (a) { a.classList.add('active'); a.scrollIntoView({ block: 'nearest', inline: 'center' }); }
+      }
+    });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('section[id]').forEach(s => spy.observe(s));
+</script>
+</body>
+</html>
