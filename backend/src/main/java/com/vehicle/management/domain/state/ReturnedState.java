@@ -34,6 +34,12 @@ public class ReturnedState implements BorrowingState {
         throw new InvalidStateTransitionException(getStateName(), "complete");
     }
 
+    /** @throws InvalidStateTransitionException 已完成的申請不可撤銷 */
+    @Override
+    public void revoke(BorrowingRequest request, String note) {
+        throw new InvalidStateTransitionException(getStateName(), "revoke");
+    }
+
     /** @return {@code "RETURNED"} */
     @Override
     public String getStateName() { return "RETURNED"; }

@@ -32,9 +32,10 @@ public class BorrowingRequest {
     private final UUID id;
     private final UUID userId;
     private final UUID vehicleId;
-    private final Instant periodStart;
-    private final Instant periodEnd;
-    private final String purpose;
+    /** 借用時段與事由可由管理員 / 主管更改（{@link #updateDetails}）。 */
+    private Instant periodStart;
+    private Instant periodEnd;
+    private String purpose;
     /** 目前狀態，由 State Pattern 物件持有並負責轉換。 */
     private BorrowingState state;
     /** 管理員填寫的審核備註（核准或拒絕原因）。 */
@@ -193,6 +194,32 @@ public class BorrowingRequest {
     public void complete(int endMileage) {
         state.complete(this);
         this.endMileage = endMileage;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * 撤銷核准，委派給目前的 {@link BorrowingState#revoke} 執行狀態轉換。
+     *
+     * @param note 撤銷原因
+     * @throws com.vehicle.management.domain.state.InvalidStateTransitionException
+     *         若目前狀態不允許撤銷（僅 APPROVED 可撤銷）
+     */
+    public void revoke(String note) {
+        state.revoke(this, note);
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * 更改借用時段與事由（管理員 / 主管編輯申請內容）。
+     *
+     * @param periodStart 新的借用開始時間
+     * @param periodEnd   新的借用結束時間
+     * @param purpose     新的借車事由
+     */
+    public void updateDetails(Instant periodStart, Instant periodEnd, String purpose) {
+        this.periodStart = periodStart;
+        this.periodEnd = periodEnd;
+        this.purpose = purpose;
         this.updatedAt = Instant.now();
     }
 
