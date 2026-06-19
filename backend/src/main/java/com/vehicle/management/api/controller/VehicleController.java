@@ -68,4 +68,20 @@ public class VehicleController {
         User actor = userService.findByEmail(principal.getUsername());
         vehicleService.deleteVehicle(actor, id);
     }
+
+    /** 查詢已軟刪除的車輛（管理員資料保留檢視）。 */
+    @GetMapping("/deleted")
+    public List<VehicleResponse> listDeleted(@AuthenticationPrincipal UserDetails principal) {
+        User actor = userService.findByEmail(principal.getUsername());
+        return vehicleService.listDeleted(actor).stream().map(VehicleResponse::from).toList();
+    }
+
+    /** 還原已軟刪除的車輛。 */
+    @PostMapping("/{id}/restore")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@AuthenticationPrincipal UserDetails principal,
+                        @PathVariable UUID id) {
+        User actor = userService.findByEmail(principal.getUsername());
+        vehicleService.restoreVehicle(actor, id);
+    }
 }

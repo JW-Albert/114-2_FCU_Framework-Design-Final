@@ -18,17 +18,18 @@ public class InMemoryVehicleRepository implements IVehicleRepository {
 
     @Override
     public Optional<Vehicle> findById(UUID id) {
-        return Optional.ofNullable(store.get(id));
+        return Optional.ofNullable(store.get(id)).filter(v -> !v.isDeleted());
     }
 
     @Override
     public List<Vehicle> findAll() {
-        return List.copyOf(store.values());
+        return store.values().stream().filter(v -> !v.isDeleted()).toList();
     }
 
     @Override
     public List<Vehicle> findAvailable(Instant periodStart, Instant periodEnd) {
         return store.values().stream()
+                .filter(v -> !v.isDeleted())
                 .filter(v -> v.getStatus() == VehicleStatus.AVAILABLE)
                 .toList();
     }
@@ -41,6 +42,18 @@ public class InMemoryVehicleRepository implements IVehicleRepository {
 
     @Override
     public void delete(UUID id) {
-        store.remove(id);
+        Vehicle v = store.get(id);
+        if (v != null) v.markDeleted();
+    }
+
+    @Override
+    public void restore(UUID id) {
+        Vehicle v = store.get(id);
+        if (v != null) v.restore();
+    }
+
+    @Override
+    public List<Vehicle> findDeleted() {
+        return store.values().stream().filter(Vehicle::isDeleted).toList();
     }
 }
