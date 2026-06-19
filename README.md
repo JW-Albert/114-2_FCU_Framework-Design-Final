@@ -573,32 +573,118 @@ classDiagram
 
 ---
 
-### 循序圖 — 完整借車工作流程
+### 循序圖 — 借車工作流程（依生命週期階段拆分）
+
+完整流程依借車申請的生命週期狀態 `PENDING → APPROVED → IN_USE → RETURNED` 拆分為四個階段，
+各自聚焦一個 REST 端點與其涉及的設計模式，避免單一大圖資訊過載。
+
+#### 階段 1：送出申請（Chain of Responsibility + State）
 
 ```mermaid
 sequenceDiagram
-    actor Employee
-    actor Admin
-    participant Controller as BorrowingController
-    participant Service as BorrowingService
-    participant State as BorrowingState
-    participant Publisher as BorrowingEventPublisher
-    participant Observer as EmailNotificationObserver
+    actor Emp as 員工
+    participant C as BorrowingController
+    participant S as BorrowingService
+    participant V as 驗證責任鏈
+    participant R as IBorrowingRepository
 
-    Employee->>Controller: POST /api/borrowings (submit)
-    Controller->>Service: submitRequest(employee, vehicleId, start, end)
-    Service->>Service: conflictStrategy.hasConflict()
-    Service->>State: new PendingState()
-    Service-->>Controller: BorrowingRequest (PENDING)
+    Emp->>C: POST /api/borrowings
+    C->>S: submitRequest(actor, vehicleId, start, end, purpose)
+    Note over S,V: Chain of Responsibility，依序驗證，任一失敗即中止
+    S->>V: validators.forEach(validate)
+    V-->>V: 1. PermissionValidator（SUBMIT_REQUEST 權限）
+    V-->>V: 2. VehicleExistenceValidator（車輛存在）
+    V-->>V: 3. TimeConflictValidator（時段衝突，委派 ConflictCheckStrategy）
+    V-->>S: 全數通過
+    S->>S: new BorrowingRequest（初始 PendingState）
+    S->>R: save(request)
+    S-->>C: BorrowingResponse（PENDING）
+    C-->>Emp: 201 Created
+```
 
-    Admin->>Controller: POST /api/borrowings/{id}/approve
-    Controller->>Service: approveRequest(admin, id, note)
-    Service->>State: state.approve(request, note)
-    State->>State: transitionState → ApprovedState
-    Service->>Publisher: notifyApproved(request)
-    Publisher->>Observer: onApproved(request)
-    Observer-->>Observer: 印出 Email 通知
-    Service-->>Controller: BorrowingRequest (APPROVED)
+#### 階段 2：審核核准 / 拒絕（Command + State + Observer）
+
+```mermaid
+sequenceDiagram
+    actor Apv as 審核者（管理員 / 主管）
+    participant C as BorrowingController
+    participant Bus as BorrowingCommandBus
+    participant Cmd as ApproveCommand
+    participant S as BorrowingService
+    participant St as BorrowingState
+    participant Obs as EmailNotificationObserver
+
+    Apv->>C: POST /api/borrowings/{id}/approve
+    Note over C,Cmd: Command Pattern，封裝操作並集中稽核
+    C->>Bus: dispatch(new ApproveCommand(...))
+    Bus->>Bus: 記錄稽核日誌 [AUDIT]
+    Bus->>Cmd: execute()
+    Cmd->>S: approveRequest(actor, id, note)
+    opt actor 角色為 MANAGER
+        S->>S: checkManagerDepartmentScope（僅限審核同部門申請）
+    end
+    Note over S,St: State Pattern，委派狀態物件轉換
+    S->>St: request.approve(note)
+    St-->>S: PendingState → ApprovedState
+    S->>S: borrowingRepo.save(request)
+    Note over S,Obs: Observer Pattern，廣播事件
+    S->>Obs: notifyApproved → onApproved（寄送 Email）
+    S-->>C: BorrowingResponse（APPROVED）
+    C-->>Apv: 200 OK
+    Note over Apv,Obs: 拒絕流程對稱，RejectCommand → rejectRequest → RejectedState → notifyRejected
+```
+
+#### 階段 3：出車（Command + State + Observer）
+
+```mermaid
+sequenceDiagram
+    actor Op as 管理端
+    participant C as BorrowingController
+    participant Bus as BorrowingCommandBus
+    participant S as BorrowingService
+    participant Veh as Vehicle / VehicleRepo
+    participant St as BorrowingState
+    participant Obs as EmailNotificationObserver
+
+    Op->>C: POST /api/borrowings/{id}/start
+    Note over C,Bus: Command Pattern，StartUseCommand
+    C->>Bus: dispatch(new StartUseCommand(...))
+    Bus->>S: execute() → startUse(id)
+    S->>Veh: markInUse() + save（車輛狀態 → IN_USE）
+    S->>St: request.startUse()
+    St-->>S: ApprovedState → InUseState
+    S->>S: borrowingRepo.save(request)
+    S->>Obs: notifyStarted → onStarted（寄送 Email）
+    S-->>C: BorrowingResponse（IN_USE）
+    C-->>Op: 200 OK
+```
+
+#### 階段 4：還車與違規偵測（Command + State + Observer + 自動違規）
+
+```mermaid
+sequenceDiagram
+    actor Op as 管理端
+    participant C as BorrowingController
+    participant Bus as BorrowingCommandBus
+    participant S as BorrowingService
+    participant Veh as Vehicle / VehicleRepo
+    participant Obs as EmailNotificationObserver
+    participant Vio as ViolationService
+
+    Op->>C: POST /api/borrowings/{id}/complete
+    Note over C,Bus: Command Pattern，CompleteCommand
+    C->>Bus: dispatch(new CompleteCommand(..., endMileage))
+    Bus->>S: execute() → completeUse(id, endMileage)
+    S->>Veh: markAvailable() + updateMileage() + save
+    S->>S: request.complete() → ReturnedState（State Pattern）
+    S->>S: borrowingRepo.save(request)
+    S->>Obs: notifyCompleted → onCompleted（寄送 Email）
+    opt 實際還車晚於預計歸還時間
+        S->>Vio: checkAndCreateOverdue(request)
+        Vio-->>Vio: 自動建立 OVERDUE 違規記錄
+    end
+    S-->>C: BorrowingResponse（RETURNED）
+    C-->>Op: 200 OK
 ```
 
 ---
