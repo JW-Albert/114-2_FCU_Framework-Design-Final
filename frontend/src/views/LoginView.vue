@@ -18,15 +18,21 @@
           {{ loading ? '登入中…' : '登入' }}
         </button>
       </form>
+
+      <div class="system-status" :class="statusClass">
+        <span class="status-dot"></span>
+        <span>系統狀態：{{ statusText }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { authApi } from '../api/auth'
+import { systemApi } from '../api/system'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -34,6 +40,23 @@ const auth = useAuthStore()
 const form = ref({ email: '', password: '' })
 const errorMsg = ref('')
 const loading = ref(false)
+
+// 系統健康狀態（Actuator）
+const systemUp = ref<boolean | null>(null)
+const statusText = computed(() =>
+  systemUp.value === null ? '檢查中…' : systemUp.value ? '正常運作' : '無法連線'
+)
+const statusClass = computed(() =>
+  systemUp.value === null ? 'checking' : systemUp.value ? 'up' : 'down'
+)
+
+onMounted(async () => {
+  try {
+    systemUp.value = (await systemApi.health()) === 'UP'
+  } catch {
+    systemUp.value = false
+  }
+})
 
 async function handleLogin() {
   errorMsg.value = ''
@@ -142,5 +165,36 @@ button:disabled {
   color: #ef4444;
   font-size: 0.85rem;
   margin-bottom: 0.5rem;
+}
+
+.system-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.system-status.up .status-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.system-status.down .status-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+.system-status.down {
+  color: #ef4444;
 }
 </style>
