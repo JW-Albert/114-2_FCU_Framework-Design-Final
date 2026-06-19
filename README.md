@@ -722,7 +722,7 @@ cd backend
 Dev 模式啟動後會自動建立：
 - 管理員帳號：`admin@demo.com` / `Admin1234`
 - 主管帳號：`manager@demo.com` / `Manager1234`（部門：測試部門）
-- 員工帳號（員工甲）：`emp@demo.com` / `Emp1234`（部門：測試部門）
+- 員工帳號（員工甲）：`emp@demo.com` / `Emp12345`（部門：測試部門）
 - 3 輛測試車輛
 
 > 主管與員工甲同屬「測試部門」，可用於展示「主管僅能審核同部門員工借車申請」的部門範圍限制功能。
@@ -769,7 +769,7 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/register `
 
 Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/register `
   -ContentType "application/json" `
-  -Body '{"name":"員工甲","email":"emp@company.com","password":"Emp1234","role":"EMPLOYEE"}'
+  -Body '{"name":"員工甲","email":"emp@company.com","password":"Emp12345","role":"EMPLOYEE"}'
 ```
 
 ```bash
@@ -780,7 +780,7 @@ curl -X POST http://localhost:8080/api/auth/register \
 
 curl -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"員工甲","email":"emp@company.com","password":"Emp1234","role":"EMPLOYEE"}'
+  -d '{"name":"員工甲","email":"emp@company.com","password":"Emp12345","role":"EMPLOYEE"}'
 ```
 
 ---

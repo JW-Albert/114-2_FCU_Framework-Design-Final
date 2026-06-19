@@ -66,6 +66,33 @@
         </tbody>
       </table>
     </section>
+
+    <!-- 已刪除車輛（軟刪除，可還原）-->
+    <section v-if="deletedVehicles.length > 0" class="card">
+      <div class="section-header">
+        <h3>已刪除車輛（{{ deletedVehicles.length }}）</h3>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>車牌</th>
+            <th>車款</th>
+            <th>年份</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="v in deletedVehicles" :key="v.id" class="deleted-row">
+            <td><strong>{{ v.plate }}</strong></td>
+            <td>{{ v.model }}</td>
+            <td>{{ v.year }}</td>
+            <td>
+              <button class="btn secondary small" @click="restoreVehicle(v.id)">還原</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   </div>
 </template>
 
@@ -74,18 +101,41 @@ import { ref, onMounted } from 'vue'
 import { vehiclesApi, type Vehicle } from '../api/vehicles'
 
 const vehicles = ref<Vehicle[]>([])
+const deletedVehicles = ref<Vehicle[]>([])
 const saving = ref(false)
 const formError = ref('')
 const editId = ref<string | null>(null)
 const form = ref({ plate: '', model: '', year: new Date().getFullYear() })
 
-onMounted(loadVehicles)
+onMounted(() => {
+  loadVehicles()
+  loadDeleted()
+})
 
 async function loadVehicles() {
   try {
     const { data } = await vehiclesApi.listAll()
     vehicles.value = data
   } catch {}
+}
+
+async function loadDeleted() {
+  try {
+    const { data } = await vehiclesApi.listDeleted()
+    deletedVehicles.value = data
+  } catch {
+    deletedVehicles.value = []
+  }
+}
+
+async function restoreVehicle(id: string) {
+  try {
+    await vehiclesApi.restore(id)
+    await loadVehicles()
+    await loadDeleted()
+  } catch (e: any) {
+    alert(e.response?.data?.error ?? '還原失敗')
+  }
 }
 
 async function saveVehicle() {
@@ -112,10 +162,11 @@ async function saveVehicle() {
 }
 
 async function deleteVehicle(id: string) {
-  if (!confirm('確定刪除此車輛？')) return
+  if (!confirm('確定刪除此車輛？刪除後可於下方「已刪除車輛」還原。')) return
   try {
     await vehiclesApi.delete(id)
     await loadVehicles()
+    await loadDeleted()
   } catch (e: any) {
     alert(e.response?.data?.error ?? '刪除失敗')
   }
@@ -183,4 +234,6 @@ input:focus { outline: none; border-color: #3b82f6; }
 .btn.secondary:hover { background: #e2e8f0; }
 .empty { color: #94a3b8; font-size: 0.9rem; padding: 1rem 0; }
 .error { color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; }
+.deleted-row td { color: #94a3b8; }
+.btn.small { padding: 0.35rem 0.8rem; font-size: 0.82rem; }
 </style>

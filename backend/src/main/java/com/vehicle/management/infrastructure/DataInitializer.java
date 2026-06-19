@@ -43,7 +43,7 @@ public class DataInitializer implements CommandLineRunner {
         // （createUserByAdmin 需要 MANAGE_USER 權限，且支援指定部門）
         User admin = userService.register("管理員", "admin@demo.com", "Admin1234", "ADMIN");
         userService.createUserByAdmin(admin, "主管", "manager@demo.com", "Manager1234", "MANAGER", "測試部門");
-        userService.createUserByAdmin(admin, "員工甲", "emp@demo.com", "Emp1234", "EMPLOYEE", "測試部門");
+        userService.createUserByAdmin(admin, "員工甲", "emp@demo.com", "Emp12345", "EMPLOYEE", "測試部門");
         log.info(">>> [DEV] 已建立測試帳號：admin@demo.com / manager@demo.com（測試部門）/ emp@demo.com（測試部門）");
 
         vehicleRepo.save(new Vehicle(UUID.randomUUID(), "ABC-1234", "Toyota Camry", 2022,

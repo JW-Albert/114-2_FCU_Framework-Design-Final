@@ -88,4 +88,22 @@ public class VehicleService extends AbstractProtectedService {
     public void deleteVehicle(User actor, UUID id) {
         requirePermission(actor, Permission.MANAGE_VEHICLE, () -> vehicleRepo.delete(id));
     }
+
+    /**
+     * 還原已軟刪除的車輛。
+     *
+     * @throws PermissionDeniedException 若使用者不具備管理車輛的權限
+     */
+    public void restoreVehicle(User actor, UUID id) {
+        requirePermission(actor, Permission.MANAGE_VEHICLE, () -> vehicleRepo.restore(id));
+    }
+
+    /**
+     * 查詢所有已軟刪除的車輛（資料保留檢視）。
+     *
+     * @throws PermissionDeniedException 若使用者不具備管理車輛的權限
+     */
+    public List<Vehicle> listDeleted(User actor) {
+        return supply(actor, Permission.MANAGE_VEHICLE, vehicleRepo::findDeleted);
+    }
 }

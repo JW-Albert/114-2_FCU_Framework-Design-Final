@@ -22,4 +22,8 @@ public interface JpaVehicleRepo extends JpaRepository<VehicleEntity, UUID> {
               )
             """)
     List<VehicleEntity> findAvailable(@Param("start") Instant start, @Param("end") Instant end);
+
+    List<VehicleEntity> findByDeletedAtIsNull();
+
+    List<VehicleEntity> findByDeletedAtIsNotNull();
 }

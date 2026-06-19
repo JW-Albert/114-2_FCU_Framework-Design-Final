@@ -48,9 +48,23 @@ public interface IVehicleRepository {
     Vehicle save(Vehicle vehicle);
 
     /**
-     * 依 ID 刪除車輛。
+     * 軟刪除車輛（標記為已刪除，不實際移除資料；查詢預設排除已刪除）。
      *
      * @param id 欲刪除的車輛唯一識別碼
      */
     void delete(UUID id);
+
+    /**
+     * 還原已軟刪除的車輛。
+     *
+     * @param id 欲還原的車輛唯一識別碼
+     */
+    void restore(UUID id);
+
+    /**
+     * 查詢所有已軟刪除的車輛。
+     *
+     * @return 已刪除車輛清單
+     */
+    List<Vehicle> findDeleted();
 }

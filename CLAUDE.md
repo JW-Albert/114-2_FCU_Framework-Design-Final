@@ -63,7 +63,7 @@ cd backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 # Windows: .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"
 # API 啟動於 http://localhost:8080
-# 自動建立：admin@demo.com / Admin1234、emp@demo.com / Emp1234
+# 自動建立：admin@demo.com / Admin1234、emp@demo.com / Emp12345
 ```
 
 **前端**

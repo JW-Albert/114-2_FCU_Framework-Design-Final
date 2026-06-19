@@ -18,15 +18,23 @@ public class BorrowingCommandBus {
 
     private static final Logger log = LoggerFactory.getLogger(BorrowingCommandBus.class);
 
+    private final AuditService auditService;
+
+    public BorrowingCommandBus(AuditService auditService) {
+        this.auditService = auditService;
+    }
+
     /**
-     * 執行借車命令並記錄稽核日誌。
+     * 執行借車命令，記錄稽核日誌（log）並持久化稽核紀錄（DB）。
      *
      * @param command 要執行的命令
      * @return 執行後的借車申請物件
      */
     public BorrowingRequest dispatch(BorrowingCommand command) {
         BorrowingRequest result = command.execute();
+        String action = command.getClass().getSimpleName();
         log.info("[AUDIT] {} → id={}", command.describe(), result.getId());
+        auditService.record(action, command.describe(), result.getId());
         return result;
     }
 }

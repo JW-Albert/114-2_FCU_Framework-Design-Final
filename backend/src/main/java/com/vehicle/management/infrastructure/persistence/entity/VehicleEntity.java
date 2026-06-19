@@ -30,6 +30,10 @@ public class VehicleEntity {
     @Column(name = "current_mileage", nullable = false)
     private int currentMileage = 0;
 
+    /** 軟刪除時間戳；null 表示未刪除。 */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     public VehicleEntity() {}
 
     public UUID getId() { return id; }
@@ -46,4 +50,6 @@ public class VehicleEntity {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public int getCurrentMileage() { return currentMileage; }
     public void setCurrentMileage(int currentMileage) { this.currentMileage = currentMileage; }
+    public Instant getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
 }
