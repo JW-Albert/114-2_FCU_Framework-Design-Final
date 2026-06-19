@@ -18,6 +18,13 @@ import com.vehicle.management.domain.model.BorrowingRequest;
 public interface BorrowingEventObserver {
 
     /**
+     * 借車申請被送出時觸發（進入 PENDING 狀態，等待審核）。
+     *
+     * @param request 剛送出的借車申請
+     */
+    void onSubmitted(BorrowingRequest request);
+
+    /**
      * 借車申請被核准時觸發。
      *
      * @param request 已核准的借車申請

@@ -23,6 +23,10 @@
         </template>
       </div>
       <div class="nav-right">
+        <router-link to="/inbox" class="inbox-link" :class="{ 'has-unread': notif.unreadCount > 0 }" title="收件匣">
+          <span class="inbox-icon">📥</span>
+          <span v-if="notif.unreadCount > 0" class="inbox-badge">{{ notif.unreadCount > 99 ? '99+' : notif.unreadCount }}</span>
+        </router-link>
         <span class="user-name">{{ auth.userName }}</span>
         <span class="role-badge" :class="auth.isAdmin ? 'admin' : auth.isManager ? 'manager' : 'employee'">
           {{ auth.isAdmin ? '管理員' : auth.isManager ? '主管' : '員工' }}
@@ -38,11 +42,45 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { useNotificationStore } from './stores/notifications'
 
 const auth = useAuthStore()
+const notif = useNotificationStore()
 const router = useRouter()
+
+let timer: number | undefined
+
+function startPolling() {
+  notif.refresh()
+  stopPolling()
+  timer = window.setInterval(() => notif.refresh(), 30000)
+}
+
+function stopPolling() {
+  if (timer) {
+    clearInterval(timer)
+    timer = undefined
+  }
+}
+
+onMounted(() => {
+  if (auth.token) startPolling()
+})
+
+onUnmounted(stopPolling)
+
+// 登入後開始輪詢未讀數，登出時停止並歸零（狀態燈熄滅）
+watch(() => auth.token, (token) => {
+  if (token) {
+    startPolling()
+  } else {
+    stopPolling()
+    notif.reset()
+  }
+})
 
 function handleLogout() {
   auth.logout()
@@ -112,6 +150,48 @@ body {
   align-items: center;
   gap: 0.75rem;
   margin-left: auto;
+}
+
+.inbox-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.inbox-link:hover,
+.inbox-link.router-link-active {
+  background: #334155;
+}
+
+.inbox-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  filter: grayscale(0.4);
+}
+
+.inbox-link.has-unread .inbox-icon {
+  filter: none;
+}
+
+.inbox-badge {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px #1e293b;
 }
 
 .user-name {

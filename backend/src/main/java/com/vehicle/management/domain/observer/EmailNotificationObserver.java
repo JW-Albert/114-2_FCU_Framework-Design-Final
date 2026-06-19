@@ -16,6 +16,16 @@ import org.springframework.stereotype.Component;
 public class EmailNotificationObserver implements BorrowingEventObserver {
 
     /**
+     * 申請送出通知。
+     *
+     * @param request 剛送出的借車申請
+     */
+    @Override
+    public void onSubmitted(BorrowingRequest request) {
+        System.out.printf("[Email] 借車申請 %s 已送出，等待審核。%n", request.getId());
+    }
+
+    /**
      * 申請核准通知。
      *
      * @param request 已核准的借車申請

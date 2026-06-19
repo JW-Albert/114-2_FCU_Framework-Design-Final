@@ -43,6 +43,15 @@ public abstract class BorrowingEventPublisher {
     }
 
     /**
+     * 廣播「申請送出」事件給所有觀察者。
+     *
+     * @param request 剛送出的借車申請
+     */
+    protected void notifySubmitted(BorrowingRequest request) {
+        observers.forEach(o -> o.onSubmitted(request));
+    }
+
+    /**
      * 廣播「申請核准」事件給所有觀察者。
      *
      * @param request 剛被核准的借車申請

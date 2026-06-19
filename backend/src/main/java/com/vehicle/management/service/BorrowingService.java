@@ -93,7 +93,9 @@ public class BorrowingService extends BorrowingEventPublisher {
 
         BorrowingRequest request = new BorrowingRequest(
                 UUID.randomUUID(), actor.getId(), vehicleId, start, end, purpose, Instant.now());
-        return borrowingRepo.save(request);
+        BorrowingRequest saved = borrowingRepo.save(request);
+        notifySubmitted(saved);  // Observer Pattern：廣播送出事件（寫入審核者收件夾）
+        return saved;
     }
 
     /**
