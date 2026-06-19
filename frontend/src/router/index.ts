@@ -12,6 +12,7 @@ const routes = [
   { path: '/admin/violations', component: () => import('../views/AdminViolationsView.vue'), meta: { requiresAuth: true, approverOnly: true } },
   { path: '/admin/calendar', component: () => import('../views/CalendarView.vue'), meta: { requiresAuth: true } },
   { path: '/admin/dashboard', component: () => import('../views/AdminDashboardView.vue'), meta: { requiresAuth: true } },
+  { path: '/inbox', component: () => import('../views/InboxView.vue'), meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({
