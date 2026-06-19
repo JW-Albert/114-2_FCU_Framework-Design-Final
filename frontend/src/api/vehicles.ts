@@ -25,4 +25,8 @@ export const vehiclesApi = {
     client.put<Vehicle>(`/vehicles/${id}`, { plate, model, year }),
 
   delete: (id: string) => client.delete(`/vehicles/${id}`),
+
+  listDeleted: () => client.get<Vehicle[]>('/vehicles/deleted'),
+
+  restore: (id: string) => client.post(`/vehicles/${id}/restore`),
 }

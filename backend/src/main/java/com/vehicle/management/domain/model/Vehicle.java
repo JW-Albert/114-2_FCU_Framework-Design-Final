@@ -34,6 +34,8 @@ public class Vehicle {
     private final Instant createdAt;
     /** 車輛目前累積里程（公里），預設為 0。 */
     private int currentMileage;
+    /** 軟刪除時間戳；{@code null} 表示未刪除。 */
+    private Instant deletedAt;
 
     /**
      * 建構車輛物件。
@@ -144,5 +146,30 @@ public class Vehicle {
                     "New mileage " + km + " is less than current mileage " + currentMileage);
         }
         this.currentMileage = km;
+    }
+
+    /** 標記為已軟刪除（記錄刪除時間）。 */
+    public void markDeleted() {
+        this.deletedAt = Instant.now();
+    }
+
+    /** 還原軟刪除（清除刪除時間）。 */
+    public void restore() {
+        this.deletedAt = null;
+    }
+
+    /** @return 是否已軟刪除 */
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    /** @return 軟刪除時間戳（未刪除為 {@code null}） */
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    /** 由 Adapter 於還原 domain 時設定刪除時間戳。 */
+    public void setDeletedAt(Instant deletedAt) {
+        this.deletedAt = deletedAt;
     }
 }

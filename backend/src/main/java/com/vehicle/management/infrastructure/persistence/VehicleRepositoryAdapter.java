@@ -27,17 +27,19 @@ public class VehicleRepositoryAdapter implements IVehicleRepository {
 
     @Override
     public Optional<Vehicle> findById(UUID id) {
-        return jpa.findById(id).map(this::toDomain);
+        return jpa.findById(id).filter(e -> e.getDeletedAt() == null).map(this::toDomain);
     }
 
     @Override
     public List<Vehicle> findAll() {
-        return jpa.findAll().stream().map(this::toDomain).toList();
+        return jpa.findByDeletedAtIsNull().stream().map(this::toDomain).toList();
     }
 
     @Override
     public List<Vehicle> findAvailable(Instant start, Instant end) {
-        return jpa.findAvailable(start, end).stream().map(this::toDomain).toList();
+        return jpa.findAvailable(start, end).stream()
+                .filter(e -> e.getDeletedAt() == null)
+                .map(this::toDomain).toList();
     }
 
     @Override
@@ -48,12 +50,31 @@ public class VehicleRepositoryAdapter implements IVehicleRepository {
 
     @Override
     public void delete(UUID id) {
-        jpa.deleteById(id);
+        // 軟刪除：標記 deletedAt 而非實際移除
+        jpa.findById(id).ifPresent(e -> {
+            e.setDeletedAt(Instant.now());
+            jpa.save(e);
+        });
+    }
+
+    @Override
+    public void restore(UUID id) {
+        jpa.findById(id).ifPresent(e -> {
+            e.setDeletedAt(null);
+            jpa.save(e);
+        });
+    }
+
+    @Override
+    public List<Vehicle> findDeleted() {
+        return jpa.findByDeletedAtIsNotNull().stream().map(this::toDomain).toList();
     }
 
     private Vehicle toDomain(VehicleEntity e) {
-        return new Vehicle(e.getId(), e.getPlate(), e.getModel(), e.getYear(),
+        Vehicle v = new Vehicle(e.getId(), e.getPlate(), e.getModel(), e.getYear(),
                 VehicleStatus.valueOf(e.getStatus()), e.getCreatedAt(), e.getCurrentMileage());
+        v.setDeletedAt(e.getDeletedAt());
+        return v;
     }
 
     private VehicleEntity toEntity(Vehicle v) {
@@ -65,6 +86,7 @@ public class VehicleRepositoryAdapter implements IVehicleRepository {
         e.setStatus(v.getStatus().name());
         e.setCreatedAt(v.getCreatedAt());
         e.setCurrentMileage(v.getCurrentMileage());
+        e.setDeletedAt(v.getDeletedAt());
         return e;
     }
 }
