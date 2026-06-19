@@ -39,6 +39,17 @@ public class ApprovedState implements BorrowingState {
         throw new InvalidStateTransitionException(getStateName(), "complete");
     }
 
+    /**
+     * 撤銷核准，狀態退回 {@link PendingState}（重新待審核）。
+     *
+     * @param request 借車申請物件
+     * @param note    撤銷原因
+     */
+    @Override
+    public void revoke(BorrowingRequest request, String note) {
+        request.transitionState(new PendingState(), note);
+    }
+
     /** @return {@code "APPROVED"} */
     @Override
     public String getStateName() { return "APPROVED"; }

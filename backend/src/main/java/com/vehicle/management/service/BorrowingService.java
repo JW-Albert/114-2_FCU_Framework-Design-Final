@@ -147,6 +147,59 @@ public class BorrowingService extends BorrowingEventPublisher {
     }
 
     /**
+     * 撤銷核准（APPROVED → PENDING），收回核准決定，申請退回待審核。
+     *
+     * @param actor     執行撤銷的管理員或主管
+     * @param requestId 申請單 ID
+     * @param note      撤銷原因
+     * @return 已更新的借車申請（狀態回到 PENDING）
+     * @throws PermissionDeniedException 若使用者不具備審核權限
+     */
+    public BorrowingRequest revokeApproval(User actor, UUID requestId, String note) {
+        if (!actor.can(Permission.APPROVE_BORROWING)) {
+            throw new PermissionDeniedException(actor.getEmail() + " cannot revoke approvals");
+        }
+        BorrowingRequest request = getRequest(requestId);
+        checkManagerDepartmentScope(actor, request);
+        request.revoke(note);  // State Pattern：ApprovedState → PendingState
+        return borrowingRepo.save(request);
+    }
+
+    /**
+     * 更改申請的借用時段與事由，並重新檢查時段衝突。
+     *
+     * @param actor     執行編輯的管理員或主管
+     * @param requestId 申請單 ID
+     * @param start     新的借用開始時間
+     * @param end       新的借用結束時間
+     * @param purpose   新的借車事由
+     * @return 已更新的借車申請
+     * @throws PermissionDeniedException 若使用者不具備審核權限
+     * @throws ConflictException         若新時段與其他申請衝突
+     */
+    public BorrowingRequest updateRequestDetails(User actor, UUID requestId,
+                                                 Instant start, Instant end, String purpose) {
+        if (!actor.can(Permission.APPROVE_BORROWING)) {
+            throw new PermissionDeniedException(actor.getEmail() + " cannot edit requests");
+        }
+        BorrowingRequest request = getRequest(requestId);
+        checkManagerDepartmentScope(actor, request);
+        // 重新檢查時段衝突（排除本申請自己；只考慮進行中的申請）
+        boolean hasConflict = borrowingRepo.findConflicting(request.getVehicleId(), start, end).stream()
+                .filter(r -> !r.getId().equals(requestId))
+                .anyMatch(r -> {
+                    String s = r.getStateName();
+                    return ("PENDING".equals(s) || "APPROVED".equals(s) || "IN_USE".equals(s))
+                            && start.isBefore(r.getPeriodEnd()) && end.isAfter(r.getPeriodStart());
+                });
+        if (hasConflict) {
+            throw new ConflictException("Vehicle is already booked for this period");
+        }
+        request.updateDetails(start, end, purpose);
+        return borrowingRepo.save(request);
+    }
+
+    /**
      * 執行出車（APPROVED → IN_USE），同步更新車輛狀態為 IN_USE。
      *
      * @param requestId 申請單 ID

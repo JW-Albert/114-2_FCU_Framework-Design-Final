@@ -45,6 +45,12 @@ export const borrowingsApi = {
   complete: (id: string, endMileage: number) =>
     client.post<BorrowingRequest>(`/borrowings/${id}/complete`, { endMileage }),
 
+  revoke: (id: string, note?: string) =>
+    client.post<BorrowingRequest>(`/borrowings/${id}/revoke`, { note }),
+
+  updateDetails: (id: string, periodStart: string, periodEnd: string, purpose: string) =>
+    client.put<BorrowingRequest>(`/borrowings/${id}/details`, { periodStart, periodEnd, purpose }),
+
   checkConflict: (vehicleId: string, start: string, end: string) =>
     client.get<ConflictCheckResult>('/borrowings/conflict-check', {
       params: { vehicleId, start, end }

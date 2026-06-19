@@ -39,6 +39,12 @@ public class InUseState implements BorrowingState {
         request.transitionState(new ReturnedState(), null);
     }
 
+    /** @throws InvalidStateTransitionException 已出車，不可撤銷核准 */
+    @Override
+    public void revoke(BorrowingRequest request, String note) {
+        throw new InvalidStateTransitionException(getStateName(), "revoke");
+    }
+
     /** @return {@code "IN_USE"} */
     @Override
     public String getStateName() { return "IN_USE"; }

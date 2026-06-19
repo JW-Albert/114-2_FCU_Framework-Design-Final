@@ -5,9 +5,11 @@ import com.vehicle.management.api.dto.CompleteBorrowingRequest;
 import com.vehicle.management.api.dto.ConflictCheckResponse;
 import com.vehicle.management.api.dto.ReviewBorrowingRequest;
 import com.vehicle.management.api.dto.SubmitBorrowingRequest;
+import com.vehicle.management.api.dto.UpdateBorrowingDetailsRequest;
 import com.vehicle.management.domain.command.ApproveCommand;
 import com.vehicle.management.domain.command.CompleteCommand;
 import com.vehicle.management.domain.command.RejectCommand;
+import com.vehicle.management.domain.command.RevokeCommand;
 import com.vehicle.management.domain.command.StartUseCommand;
 import com.vehicle.management.domain.model.BorrowingRequest;
 import com.vehicle.management.domain.model.User;
@@ -101,6 +103,26 @@ public class BorrowingController {
         User actor = userService.findByEmail(principal.getUsername());
         String note = req != null ? req.note() : null;
         return BorrowingResponse.from(commandBus.dispatch(new RejectCommand(borrowingService, actor, id, note)));
+    }
+
+    /** 撤銷核准（APPROVED → PENDING），管理員 / 主管適用。 */
+    @PostMapping("/{id}/revoke")
+    public BorrowingResponse revoke(@AuthenticationPrincipal UserDetails principal,
+                                     @PathVariable UUID id,
+                                     @RequestBody(required = false) ReviewBorrowingRequest req) {
+        User actor = userService.findByEmail(principal.getUsername());
+        String note = req != null ? req.note() : null;
+        return BorrowingResponse.from(commandBus.dispatch(new RevokeCommand(borrowingService, actor, id, note)));
+    }
+
+    /** 更改申請的借用時段與事由，管理員 / 主管適用。 */
+    @PutMapping("/{id}/details")
+    public BorrowingResponse updateDetails(@AuthenticationPrincipal UserDetails principal,
+                                            @PathVariable UUID id,
+                                            @Valid @RequestBody UpdateBorrowingDetailsRequest req) {
+        User actor = userService.findByEmail(principal.getUsername());
+        return BorrowingResponse.from(borrowingService.updateRequestDetails(
+                actor, id, req.periodStart(), req.periodEnd(), req.purpose()));
     }
 
     @PostMapping("/{id}/start")

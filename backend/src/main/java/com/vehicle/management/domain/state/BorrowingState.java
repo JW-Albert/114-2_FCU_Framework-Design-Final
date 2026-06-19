@@ -62,6 +62,15 @@ public interface BorrowingState {
     void complete(BorrowingRequest request);
 
     /**
+     * 撤銷核准，將已核准的申請退回待審核（僅 {@link ApprovedState} 允許）。
+     *
+     * @param request 借車申請物件
+     * @param note    撤銷原因
+     * @throws InvalidStateTransitionException 若目前狀態不允許撤銷
+     */
+    void revoke(BorrowingRequest request, String note);
+
+    /**
      * 取得此狀態的名稱字串。
      *
      * @return 狀態名稱，例如 {@code "PENDING"}、{@code "APPROVED"}

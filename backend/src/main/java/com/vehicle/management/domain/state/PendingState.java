@@ -45,6 +45,12 @@ public class PendingState implements BorrowingState {
         throw new InvalidStateTransitionException(getStateName(), "complete");
     }
 
+    /** @throws InvalidStateTransitionException 尚未核准，無核准可撤銷 */
+    @Override
+    public void revoke(BorrowingRequest request, String note) {
+        throw new InvalidStateTransitionException(getStateName(), "revoke");
+    }
+
     /** @return {@code "PENDING"} */
     @Override
     public String getStateName() { return "PENDING"; }

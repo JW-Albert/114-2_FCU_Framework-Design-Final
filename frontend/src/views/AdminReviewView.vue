@@ -88,7 +88,14 @@
             <td>{{ r.reviewNote ?? '—' }}</td>
             <td>{{ fmt(r.createdAt) }}</td>
             <td>
-              <div v-if="r.state === 'IN_USE'" class="complete-inline">
+              <div v-if="editingId === r.id" class="edit-inline">
+                <input v-model="editForm.start" type="datetime-local" class="edit-input" />
+                <input v-model="editForm.end" type="datetime-local" class="edit-input" />
+                <input v-model="editForm.purpose" placeholder="事由" class="edit-input wide" />
+                <button class="btn approve" @click="saveEdit(r.id)" :disabled="actionLoading[r.id]">儲存</button>
+                <button class="btn secondary" @click="cancelEdit">取消</button>
+              </div>
+              <div v-else-if="r.state === 'IN_USE'" class="complete-inline">
                 <input
                   v-model.number="mileageMap[r.id]"
                   type="number"
@@ -103,6 +110,12 @@
                 >
                   完成還車
                 </button>
+              </div>
+              <div v-else-if="r.state === 'PENDING' || r.state === 'APPROVED'" class="row-actions">
+                <button v-if="r.state === 'APPROVED'" class="btn revoke" @click="revoke(r.id)" :disabled="actionLoading[r.id]">
+                  撤銷核准
+                </button>
+                <button class="btn edit" @click="startEdit(r)">編輯</button>
               </div>
               <span v-else-if="r.endMileage != null" class="mileage-info">{{ r.endMileage }} km</span>
               <span v-else>—</span>
@@ -130,6 +143,8 @@ const vehicleMap = ref<Record<string, string>>({})
 const noteMap = ref<Record<string, string>>({})
 const mileageMap = ref<Record<string, number>>({})
 const actionLoading = ref<Record<string, boolean>>({})
+const editingId = ref<string | null>(null)
+const editForm = ref({ start: '', end: '', purpose: '' })
 
 onMounted(async () => {
   await Promise.all([loadPending(), loadVehicleMap()])
@@ -190,6 +205,54 @@ async function complete(id: string) {
   } finally {
     actionLoading.value[id] = false
   }
+}
+
+async function revoke(id: string) {
+  if (!confirm('確定撤銷此申請的核准？將退回待審核。')) return
+  actionLoading.value[id] = true
+  try {
+    await borrowingsApi.revoke(id, noteMap.value[id])
+    await Promise.all([loadAll(), loadPending()])
+  } catch (e: any) {
+    alert(e.response?.data?.error ?? '撤銷失敗')
+  } finally {
+    actionLoading.value[id] = false
+  }
+}
+
+function startEdit(r: BorrowingRequest) {
+  editingId.value = r.id
+  editForm.value = {
+    start: toLocalInput(r.periodStart),
+    end: toLocalInput(r.periodEnd),
+    purpose: r.purpose,
+  }
+}
+
+function cancelEdit() {
+  editingId.value = null
+}
+
+async function saveEdit(id: string) {
+  const { start, end, purpose } = editForm.value
+  if (!start || !end) return
+  actionLoading.value[id] = true
+  try {
+    await borrowingsApi.updateDetails(
+      id, new Date(start).toISOString(), new Date(end).toISOString(), purpose)
+    editingId.value = null
+    await loadAll()
+  } catch (e: any) {
+    alert(e.response?.data?.error ?? '更新失敗')
+  } finally {
+    actionLoading.value[id] = false
+  }
+}
+
+function toLocalInput(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 async function handleExport() {
@@ -271,6 +334,15 @@ h3 { font-size: 1.05rem; margin-bottom: 1rem; color: #334155; }
 .btn.complete { background: #ede9fe; color: #6d28d9; }
 .btn.complete:hover:not(:disabled) { background: #ddd6fe; }
 .mileage-info { font-size: 0.82rem; color: #475569; }
+.btn.revoke { background: #fef3c7; color: #b45309; }
+.btn.revoke:hover:not(:disabled) { background: #fde68a; }
+.btn.edit { background: #e0e7ff; color: #4338ca; }
+.btn.edit:hover:not(:disabled) { background: #c7d2fe; }
+.row-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.edit-inline { display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; }
+.edit-input { padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; }
+.edit-input.wide { min-width: 120px; }
+.edit-input:focus { outline: none; border-color: #3b82f6; }
 .export-section { margin-bottom: 1.25rem; }
 .export-row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
 .export-label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: #475569; font-weight: 500; }
