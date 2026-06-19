@@ -57,6 +57,7 @@ public class UserService {
         if (userRepo.existsByEmail(email)) {
             throw new ConflictException("Email already registered: " + email);
         }
+        PasswordPolicy.validate(rawPassword);
         // Factory Method：透過工廠建立角色，不直接依賴具體角色類別
         Role role = RoleFactory.create(roleName);
         User user = new User(UUID.randomUUID(), name, email,
@@ -159,6 +160,7 @@ public class UserService {
         if (userRepo.existsByEmail(email)) {
             throw new ConflictException("Email already registered: " + email);
         }
+        PasswordPolicy.validate(rawPassword);
         Role role = RoleFactory.create(roleName);
         User user = new User(UUID.randomUUID(), name, email,
                 passwordEncoder.encode(rawPassword), Set.of(role), Instant.now(), department);

@@ -1,9 +1,11 @@
 package com.vehicle.management.api.controller;
 
 import com.vehicle.management.domain.state.InvalidStateTransitionException;
+import com.vehicle.management.service.AccountLockedException;
 import com.vehicle.management.service.ConflictException;
 import com.vehicle.management.service.PermissionDeniedException;
 import com.vehicle.management.service.ResourceNotFoundException;
+import com.vehicle.management.service.WeakPasswordException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -46,6 +48,18 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public Map<String, Object> handleBadCredentials(BadCredentialsException ex) {
         return error(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(WeakPasswordException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, Object> handleWeakPassword(WeakPasswordException ex) {
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(AccountLockedException.class)
+    @ResponseStatus(HttpStatus.LOCKED)
+    public Map<String, Object> handleAccountLocked(AccountLockedException ex) {
+        return error(HttpStatus.LOCKED, ex.getMessage());
     }
 
     /**
