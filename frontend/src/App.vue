@@ -10,6 +10,7 @@
           <router-link to="/admin/maintenance">保養管理</router-link>
           <router-link to="/admin/users">使用者管理</router-link>
           <router-link to="/admin/violations">違規記錄</router-link>
+          <router-link to="/admin/audit">稽核日誌</router-link>
           <router-link to="/admin/calendar">借用日曆</router-link>
         </template>
         <template v-else-if="auth.isManager">
