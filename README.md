@@ -26,6 +26,11 @@
 | 審核工作流 | 管理員核准 / 拒絕、備注填寫、全部記錄查詢 |
 | 保養管理 | 保養紀錄新增 / 查詢、到期日提醒 |
 | 違規管理 | 還車超時自動登錄、管理員 / 主管手動登錄（車損、違停、交通違規等） |
+| 通知收件夾 | 站內訊息中心 + 未讀狀態燈，借車事件自動通知相關人（Observer Pattern） |
+| 稽核日誌 | 借車狀態操作自動記錄並持久化，管理員可查詢（Command Pattern） |
+| 帳號安全 | 密碼強度政策、連續登入失敗帳號鎖定 |
+| 資料治理 | 車輛軟刪除與還原，保留資料可追溯 |
+| 申請維護 | 管理員 / 主管撤銷已核准申請、更改申請內容 |
 
 ---
 
@@ -37,6 +42,8 @@
 | 安全認證 | Spring Security + JJWT | 0.12.6 |
 | 資料庫 | PostgreSQL + Spring Data JPA | — |
 | DB 遷移 | Flyway | — |
+| API 文件 | springdoc-openapi（Swagger UI） | 2.6.0 |
+| 健康監控 | Spring Boot Actuator | — |
 | 前端框架 | Vue 3 + TypeScript | — |
 | 狀態管理 | Pinia | 2.x |
 | HTTP 客戶端 | Axios | 1.x |
@@ -81,42 +88,49 @@
 │       │   │   ├── controller/      # REST Controllers + GlobalExceptionHandler
 │       │   │   └── dto/             # Request / Response records
 │       │   ├── domain/
-│       │   │   ├── model/           # BorrowingRequest, Vehicle, User, MaintenanceRecord
+│       │   │   ├── model/           # BorrowingRequest, Vehicle, User, Notification, AuditLog…
 │       │   │   ├── state/           # State Pattern: BorrowingState, PendingState, …
-│       │   │   ├── role/            # Role, AdminRole, EmployeeRole, RoleFactory, Permission
-│       │   │   ├── observer/        # BorrowingEventPublisher, EmailNotificationObserver
-│       │   │   └── strategy/        # ConflictCheckStrategy, StrictOverlapStrategy
-│       │   ├── service/             # BorrowingService, VehicleService, …
-│       │   ├── repository/          # IVehicleRepository, IBorrowingRepository, …
+│       │   │   ├── role/            # Role, AdminRole, EmployeeRole, ManagerRole, RoleFactory
+│       │   │   ├── observer/        # BorrowingEventPublisher, Email/InboxNotificationObserver
+│       │   │   ├── strategy/        # ConflictCheckStrategy, StrictOverlapStrategy, BufferedOverlapDecorator
+│       │   │   ├── chain/           # Chain of Responsibility: BorrowingValidator 責任鏈
+│       │   │   └── command/         # Command Pattern: ApproveCommand, RejectCommand, …
+│       │   ├── service/             # BorrowingService, NotificationService, AuditService, LoginAttemptService…
+│       │   ├── repository/          # IVehicleRepository, IBorrowingRepository, INotificationRepository…
 │       │   │   └── inmemory/        # InMemory 實作（單元測試用）
 │       │   └── infrastructure/
 │       │       ├── persistence/     # JPA Entities + Repository Adapters
-│       │       └── security/        # JwtUtil, JwtAuthFilter, SecurityConfig
+│       │       ├── security/        # JwtUtil, JwtAuthFilter, SecurityConfig
+│       │       └── config/          # OpenApiConfig（Swagger UI）
 │       └── test/java/com/vehicle/management/
 │           ├── unit/                # BorrowingServiceTest, VehicleServiceTest, …
 │           └── integration/         # BorrowingControllerTest (WebMvcTest)
 └── frontend/
     └── src/
-        ├── api/             # auth.ts / vehicles.ts / borrowings.ts / maintenance.ts
+        ├── api/             # auth / vehicles / borrowings / notifications / audit / system…
         ├── stores/          # auth.ts (Pinia)
         ├── router/          # index.ts
-        └── views/           # LoginView / EmployeeBorrowView / Admin views
+        └── views/           # LoginView / EmployeeBorrowView / InboxView / AdminAuditView / …
 ```
 
 ---
 
 ## 設計模式應用
 
-本專案實作了 **6 個 GoF 設計模式**，涵蓋 Behavioral、Structural、Creational 三大分類。
+本專案實作了 **10 個 GoF 設計模式**，涵蓋 Behavioral、Structural、Creational 三大分類，其中後 4 個（Builder、Chain of Responsibility、Decorator、Command）用於重構既有設計、消除擴充痛點。
 
 | # | 模式 | 分類 | 主要類別 |
 |---|------|------|---------|
 | 1 | [State](#1-state-pattern--借車申請生命週期) | Behavioral | `BorrowingRequest`, `BorrowingState`, `PendingState`… |
-| 2 | [Observer](#2-observer-pattern--借車事件通知) | Behavioral | `BorrowingEventPublisher`, `EmailNotificationObserver` |
+| 2 | [Observer](#2-observer-pattern--借車事件通知) | Behavioral | `BorrowingEventPublisher`, `EmailNotificationObserver`, `InboxNotificationObserver` |
 | 3 | [Strategy](#3-strategy-pattern--時段衝突檢查) | Behavioral | `ConflictCheckStrategy`, `StrictOverlapStrategy` |
 | 4 | [Template Method](#4-template-method-pattern--服務層權限守衛) | Behavioral | `AbstractProtectedService`, `VehicleService`, `MaintenanceService` |
 | 5 | [Factory Method](#5-factory-method-pattern--角色建立) | Creational | `RoleFactory`, `AdminRole`, `EmployeeRole`, `ManagerRole` |
 | 6 | [Adapter](#6-adapter-pattern--repository-橋接) | Structural | `*RepositoryAdapter`, `Jpa*Repo` |
+| 7 | [Builder](#7-builder-pattern--借車申請物件建構63) | Creational | `BorrowingRequest.Builder` |
+| 8 | [Chain of Responsibility](#8-chain-of-responsibility-pattern--借車申請多步驟驗證64) | Behavioral | `BorrowingValidator`, `PermissionValidator`, `TimeConflictValidator` |
+| 9 | [Decorator](#9-decorator-pattern--可疊加的衝突緩衝策略65) | Structural | `BufferedOverlapDecorator` |
+| 10 | [Command](#10-command-pattern--借車狀態操作稽核66) | Behavioral | `BorrowingCommand`, `BorrowingCommandBus`, `ApproveCommand` |
 
 ---
 
@@ -399,7 +413,7 @@ classDiagram
 
 ---
 
-### 6. Builder Pattern — 借車申請物件建構（[#63](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/63)）
+### 7. Builder Pattern — 借車申請物件建構（[#63](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/63)）
 
 **問題**：`BorrowingRepositoryAdapter.toDomain()` 從資料庫還原物件時，需呼叫 `r.approve(null); r.startUse();` 等副作用方法重播 State transition，會觸發 Observer 通知且邏輯脆弱。
 
@@ -436,7 +450,7 @@ classDiagram
 
 ---
 
-### 7. Chain of Responsibility Pattern — 借車申請多步驟驗證（[#64](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/64)）
+### 8. Chain of Responsibility Pattern — 借車申請多步驟驗證（[#64](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/64)）
 
 **問題**：`BorrowingService.submitRequest()` 依序進行「權限檢查 → 車輛存在 → 時段衝突」三步驗證，邏輯全寫在一個方法中，新增驗證規則需修改 Service 本身（違反 OCP）。
 
@@ -482,7 +496,7 @@ classDiagram
 
 ---
 
-### 8. Decorator Pattern — 可疊加的衝突緩衝策略（[#65](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/65)）
+### 9. Decorator Pattern — 可疊加的衝突緩衝策略（[#65](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/65)）
 
 **問題**：若需在現有嚴格重疊策略上加入「借車前後保留 30 分鐘緩衝時間」的規則，直接修改 `StrictOverlapStrategy` 會使其邏輯複雜，且難以在不同情境下選擇是否啟用緩衝。
 
@@ -512,7 +526,7 @@ classDiagram
 
 ---
 
-### 9. Command Pattern — 借車狀態操作稽核（[#66](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/66)）
+### 10. Command Pattern — 借車狀態操作稽核（[#66](https://github.com/DamnDamnDamnM3/114-2_FCU_Framework-Design-Final/issues/66)）
 
 **問題**：`BorrowingController` 直接呼叫 `borrowingService.approveRequest(...)` 等方法，各操作的稽核日誌、非同步處理等橫切關注點分散在各 endpoint，無法統一管理。
 

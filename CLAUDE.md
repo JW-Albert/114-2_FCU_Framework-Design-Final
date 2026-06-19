@@ -3,7 +3,7 @@
 ## Project Overview
 
 Project: 114-2 逢甲大學軟體框架設計期末專題 — 公司車輛管理系統
-Purpose: 企業內部車輛借用管理平台，提供借車申請、審核、出車、還車完整工作流程，並展示 OOD 原則（SOLID、LoD）與 GoF 設計模式（State、Observer、Strategy、Factory Method、Adapter）的實際應用。
+Purpose: 企業內部車輛借用管理平台，提供借車申請、審核、出車、還車完整工作流程，並涵蓋站內通知收件夾、稽核日誌、帳號安全（密碼政策 + 登入鎖定）、車輛軟刪除等企業化功能；展示 OOD 原則（SOLID、LoD）與 10 個 GoF 設計模式（State、Observer、Strategy、Template Method、Factory Method、Adapter、Builder、Chain of Responsibility、Decorator、Command）的實際應用。
 Owner: DamnDamnDamnM3（王建葦 D1210799、陳稚翔 D1249623）
 Demo: https://demo.jw-albert.dev
 
@@ -12,7 +12,7 @@ Demo: https://demo.jw-albert.dev
 **Backend**
 - Language: Java 21
 - Framework: Spring Boot 3.3.4
-- Key dependencies: Spring Security + JJWT 0.12.6、Spring Data JPA、Flyway、Apache POI 5.3.0（Excel 匯出）、H2（dev profile）、PostgreSQL（prod profile）
+- Key dependencies: Spring Security + JJWT 0.12.6、Spring Data JPA、Flyway、Apache POI 5.3.0（Excel 匯出）、springdoc-openapi 2.6.0（Swagger UI）、Spring Boot Actuator（健康監控）、H2（dev profile）、PostgreSQL（prod profile）
 - Build tool: Maven 3.9+（含 Maven Wrapper，無需全域安裝）
 
 **Frontend**
@@ -25,31 +25,34 @@ Demo: https://demo.jw-albert.dev
 ```
 backend/
   src/main/java/com/vehicle/management/
-    api/controller/     - REST Controllers（BorrowingController、VehicleController 等）
+    api/controller/     - REST Controllers（Borrowing、Vehicle、Notification、Audit、Violation 等）
     api/dto/            - Request / Response records
-    domain/model/       - 領域模型（BorrowingRequest、Vehicle、User）
+    domain/model/       - 領域模型（BorrowingRequest、Vehicle、User、Notification、AuditLog）
     domain/state/       - State Pattern（PendingState、ApprovedState、InUseState 等）
     domain/role/        - Role / Permission、RoleFactory（Factory Method）
-    domain/observer/    - BorrowingEventPublisher、EmailNotificationObserver
-    domain/strategy/    - ConflictCheckStrategy、StrictOverlapStrategy
-    service/            - BorrowingService、VehicleService、ViolationService 等
-    repository/         - 介面定義（IBorrowingRepository 等）+ InMemory 實作（測試用）
+    domain/observer/    - BorrowingEventPublisher、Email/InboxNotificationObserver（Observer）
+    domain/strategy/    - ConflictCheckStrategy、StrictOverlapStrategy、BufferedOverlapDecorator（Decorator）
+    domain/chain/       - BorrowingValidator 責任鏈（Chain of Responsibility）
+    domain/command/     - BorrowingCommand、ApproveCommand 等 + BorrowingCommandBus（Command）
+    service/            - BorrowingService、NotificationService、AuditService、LoginAttemptService、PasswordPolicy 等
+    repository/         - 介面定義（IBorrowingRepository、INotificationRepository 等）+ InMemory 實作（測試用）
     infrastructure/
       persistence/      - JPA Entities + Repository Adapters（Adapter Pattern）
       security/         - JwtUtil、JwtAuthFilter、SecurityConfig
+      config/           - OpenApiConfig（Swagger UI 設定）
   src/main/resources/
     application.yml               - 預設設定（PostgreSQL prod）
     application-dev.yml           - dev profile（H2 記憶體 DB，自動建測試帳號）
-    db/migration/                 - Flyway SQL 遷移腳本（V1__init.sql … V5__violations.sql）
+    db/migration/                 - Flyway SQL 遷移腳本（V1__initial_schema.sql … V8__soft_delete_vehicles.sql）
 
 frontend/
   src/
-    api/        - auth.ts / vehicles.ts / borrowings.ts / maintenance.ts / reports.ts
+    api/        - auth / vehicles / borrowings / maintenance / reports / notifications / audit / system
     stores/     - auth.ts（Pinia，存 JWT token 與使用者資訊）
     router/     - index.ts（路由守衛：adminOnly / approverOnly / requiresAuth）
-    views/      - LoginView / EmployeeBorrowView / AdminReviewView / AdminVehiclesView
+    views/      - LoginView / EmployeeBorrowView / InboxView / AdminReviewView / AdminVehiclesView
                   AdminMaintenanceView / AdminUserManagementView / AdminViolationsView
-                  CalendarView / AdminDashboardView
+                  AdminAuditView / CalendarView / AdminDashboardView
 
 .github/workflows/
   deploy.yml    - GitHub Actions CI/CD（tag-based，建置 JAR + SSH 部署至 VPS）
@@ -101,6 +104,7 @@ npx vue-tsc --build --noEmit
 - **PM2 on VPS**：VPS 使用者無 sudo 權限，PM2 安裝於 `$HOME/.npm-global`。SSH session 不讀 `~/.profile`，因此 `java` 必須用絕對路徑啟動（`which java` 動態取得）。
 - **Vite allowedHosts**：`vite.config.ts` 中已設定 `allowedHosts: ['demo.jw-albert.dev']`，讓 Cloudflare Tunnel 可以正常存取 Vite dev server。
 - **`frontend/tsconfig.node.json`**：需包含 `"types": ["node"]` 與 `"skipLibCheck": true`，否則 CI `vue-tsc --build` 會失敗。
+- **API 文件與健康檢查**：後端啟動後可瀏覽 `http://localhost:8080/swagger-ui.html`（互動式 API 文件，可用 JWT 授權測試）與 `http://localhost:8080/actuator/health`（健康狀態）。前端 Vite proxy 已涵蓋 `/api` 與 `/actuator`。
 
 ## Workflow Rules
 
