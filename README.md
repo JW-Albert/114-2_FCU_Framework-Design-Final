@@ -284,27 +284,46 @@ classDiagram
 classDiagram
     class AbstractProtectedService {
         <<abstract>>
-        #requirePermission(actor, perm, Runnable action)
-        #supply~T~(actor, perm, Supplier~T~ action) T
-        -checkPermission(actor, perm)
+        +supply(actor, perm, Supplier action) T  「樣板方法 template」
+        +requirePermission(actor, perm, Runnable action)  「樣板方法 template」
+        #checkPermission(actor, perm)  「固定步驟 primitive」
     }
     class VehicleService {
-        +createVehicle(actor, ...) : supply(MANAGE_VEHICLE, ...)
-        +updateVehicle(actor, ...) : supply(MANAGE_VEHICLE, ...)
-        +deleteVehicle(actor, ...) : requirePermission(MANAGE_VEHICLE, ...)
+        +createVehicle(actor, ...) : supply(MANAGE_VEHICLE, lambda)
+        +deleteVehicle(actor, ...) : requirePermission(MANAGE_VEHICLE, lambda)
     }
     class MaintenanceService {
-        +addRecord(actor, ...) : supply(MANAGE_VEHICLE, ...)
-        +deleteRecord(actor, ...) : requirePermission(MANAGE_VEHICLE, ...)
+        +addRecord(actor, ...) : supply(MANAGE_VEHICLE, lambda)
     }
     class UserService {
-        +createUserByAdmin(actor, ...) : 檢查 MANAGE_USER
-        +changeUserRole(actor, ...) : 檢查 MANAGE_USER
+        +createUserByAdmin(actor, ...) : supply(MANAGE_USER, lambda)
+        +changeUserRole(actor, ...) : supply(MANAGE_USER, lambda)
     }
 
     AbstractProtectedService <|-- VehicleService
     AbstractProtectedService <|-- MaintenanceService
     AbstractProtectedService <|-- UserService
+
+    note for AbstractProtectedService "樣板方法 supply()／requirePermission() 為固定演算法骨架，內部依序呼叫兩個小步驟：① checkPermission()（固定步驟，私有 primitive）→ ② action.get()／run()（變動步驟，子類別以 lambda 提供）"
+```
+
+**樣板方法呼叫小步驟的流程（「大的」骨架方法 call「小的」step）：**
+
+```mermaid
+sequenceDiagram
+    participant Sub as 子類別 createVehicle
+    participant TM as supply 樣板方法
+    participant Fix as checkPermission 固定步驟
+    participant Var as action.get 變動步驟
+
+    Sub->>TM: supply(actor, MANAGE_VEHICLE, lambda)
+    TM->>Fix: ① 呼叫固定步驟 checkPermission(actor, perm)
+    alt 權限不足
+        Fix-->>TM: throw PermissionDeniedException
+    end
+    TM->>Var: ② 呼叫變動步驟 action.get()
+    Var-->>TM: Vehicle（業務邏輯結果）
+    TM-->>Sub: Vehicle
 ```
 
 ---
@@ -315,42 +334,60 @@ classDiagram
 
 **解法**：`RoleFactory.create(roleName)` 集中管理 `Role` 物件建立，呼叫端只依賴 `Role` 介面（DIP）。新增角色只需加入新類別與一行 `case`，不需修改呼叫端（OCP）。
 
+> **模式變體說明（依老師回饋補充）**：本專案的 `RoleFactory` 是**參數化（靜態）工廠**——以 `roleName` 參數在單一 `create()` 的 `switch` 內選擇要 `new` 的 `ConcreteProduct`，屬 GoF Factory Method 的簡化變體（業界亦稱 **Simple Factory / Static Factory**），而非「由 `Creator` 子類別各自覆寫 `factoryMethod()`」的教科書形式。下圖以 Creator / Product / ConcreteProduct / Client 四個角色標示其結構。
+
 ```mermaid
 classDiagram
+    class RoleFactory {
+        <<Creator・靜態工廠>>
+        +create(roleName) Role  「參數化 factory method」
+    }
     class Role {
-        <<interface>>
+        <<Product 介面>>
         +getName() String
         +getPermissions() Set~Permission~
     }
     class AdminRole {
+        <<ConcreteProduct>>
         +getName() : "ADMIN"
-        +getPermissions() : APPROVE_BORROWING, MANAGE_VEHICLE, MANAGE_USER, SUBMIT_REQUEST
+        +getPermissions() : APPROVE_BORROWING, MANAGE_VEHICLE, MANAGE_USER, MANAGE_VIOLATION, SUBMIT_REQUEST
     }
     class EmployeeRole {
+        <<ConcreteProduct>>
         +getName() : "EMPLOYEE"
         +getPermissions() : SUBMIT_REQUEST
     }
     class ManagerRole {
+        <<ConcreteProduct>>
         +getName() : "MANAGER"
-        +getPermissions() : APPROVE_BORROWING, SUBMIT_REQUEST
+        +getPermissions() : APPROVE_BORROWING, MANAGE_VIOLATION, SUBMIT_REQUEST
     }
-    class RoleFactory {
-        <<utility>>
-        +create(roleName) Role
+    class UserService {
+        <<Client>>
+        +建立／改角色時呼叫 RoleFactory.create(roleName)
     }
     class Permission {
         <<enum>>
         APPROVE_BORROWING
         MANAGE_VEHICLE
         MANAGE_USER
+        MANAGE_VIOLATION
         SUBMIT_REQUEST
     }
 
-    Role <|.. AdminRole
-    Role <|.. EmployeeRole
-    Role <|.. ManagerRole
-    RoleFactory ..> Role : creates
-    Role --> Permission
+    Role <|.. AdminRole : ConcreteProduct
+    Role <|.. EmployeeRole : ConcreteProduct
+    Role <|.. ManagerRole : ConcreteProduct
+    UserService ..> RoleFactory : ① create(roleName)
+    RoleFactory ..> Role : ② 回傳 Product 抽象
+    RoleFactory ..> AdminRole : 依 roleName 選擇 new
+    RoleFactory ..> EmployeeRole : new
+    RoleFactory ..> ManagerRole : new
+    AdminRole ..> Permission : 持有
+    EmployeeRole ..> Permission : 持有
+    ManagerRole ..> Permission : 持有
+
+    note for RoleFactory "參數化工廠：單一 create() 內以 switch(roleName) 選擇 ConcreteProduct，回傳 Product 抽象（Role）。呼叫端 UserService 只依賴 Role，不依賴具體角色類別。"
 ```
 
 ---
@@ -363,8 +400,12 @@ classDiagram
 
 ```mermaid
 classDiagram
+    class VehicleService {
+        <<Client>>
+        +只依賴 IVehicleRepository（Target）
+    }
     class IVehicleRepository {
-        <<interface>>
+        <<Target 介面・Domain 期望>>
         +findById(id) Optional~Vehicle~
         +findAll() List~Vehicle~
         +findAvailable(start, end) List~Vehicle~
@@ -372,6 +413,7 @@ classDiagram
         +delete(id)
     }
     class VehicleRepositoryAdapter {
+        <<Adapter>>
         -JpaVehicleRepo jpa
         +findById(id) : jpa.findById().map(toDomain)
         +save(v) : jpa.save(toEntity(v))
@@ -379,21 +421,25 @@ classDiagram
         -toEntity(vehicle) VehicleEntity
     }
     class JpaVehicleRepo {
-        <<Spring Data JPA>>
+        <<Adaptee・Spring Data JPA>>
         +findById(UUID)
         +findAll()
         +save(VehicleEntity)
     }
     class VehicleEntity {
+        <<JPA Entity>>
         UUID id
         String plate
         String model
         ...
     }
 
-    IVehicleRepository <|.. VehicleRepositoryAdapter
-    VehicleRepositoryAdapter --> JpaVehicleRepo : delegates
-    JpaVehicleRepo --> VehicleEntity : manages
+    VehicleService ..> IVehicleRepository : 依賴 Target（DIP）
+    IVehicleRepository <|.. VehicleRepositoryAdapter : 實作 Target
+    VehicleRepositoryAdapter --> JpaVehicleRepo : 委派 Adaptee
+    JpaVehicleRepo --> VehicleEntity : 管理 Entity
+
+    note for VehicleRepositoryAdapter "Adapter 角色：對外實作 Target（IVehicleRepository），對內持有並委派 Adaptee（JpaVehicleRepo），透過 toDomain()／toEntity() 在 Domain 物件與 JPA Entity 間轉換。Client（VehicleService）全程只看見 Target。"
 ```
 
 > 5 個 Adapter 結構相同：`BorrowingRepositoryAdapter`、`UserRepositoryAdapter`、`MaintenanceRepositoryAdapter`、`ViolationRepositoryAdapter`。
@@ -422,14 +468,25 @@ classDiagram
 ```mermaid
 classDiagram
     class BorrowingRequest {
+        <<Product 產品>>
+        -UUID id
+        -UUID userId
+        -UUID vehicleId
         -BorrowingState state
         -String reviewNote
+        -Instant updatedAt
         -Integer startMileage
         -Integer endMileage
-        +builder() Builder
+        +builder(id, userId, vehicleId, start, end, purpose, createdAt) Builder
         -BorrowingRequest(Builder b)
     }
     class Builder {
+        <<Builder 建造者・static nested>>
+        -BorrowingState state
+        -String reviewNote
+        -Instant updatedAt
+        -Integer startMileage
+        -Integer endMileage
         +reviewNote(note) Builder
         +updatedAt(t) Builder
         +startMileage(km) Builder
@@ -438,11 +495,20 @@ classDiagram
         +build() BorrowingRequest
     }
     class BorrowingRepositoryAdapter {
-        +toDomain(entity) BorrowingRequest
+        <<Director／Client 指揮者>>
+        +toDomain(entity) : builder(...).restoreState(s).reviewNote(n)...build()
+    }
+    class BorrowingState {
+        <<interface・產品零件>>
+        +getStateName() String
     }
 
-    BorrowingRequest *-- Builder : 內部類別（nested）
-    BorrowingRepositoryAdapter ..> Builder : 使用 Builder 還原狀態
+    BorrowingRequest *-- Builder : 內部類別（static nested）
+    BorrowingRepositoryAdapter ..> Builder : ① 逐步設定欄位（fluent 鏈）
+    Builder ..> BorrowingRequest : ② build() 產生 Product
+    Builder ..> BorrowingState : restoreState() 直接指定狀態（無轉換副作用）
+
+    note for Builder "每個 setter 回傳 this 形成流暢鏈；restoreState(stateName) 以 switch 直接建立對應的 BorrowingState（PendingState／ApprovedState／InUseState／ReturnedState／RejectedState），繞過 approve()／startUse() 等會觸發 Observer 的副作用方法。"
 ```
 
 > `toDomain()` 舊寫法：`r.approve(null); r.startUse();`（重播副作用）
@@ -505,21 +571,33 @@ classDiagram
 ```mermaid
 classDiagram
     class ConflictCheckStrategy {
-        <<interface>>
+        <<Component 介面>>
         +hasConflict(existing, start, end) boolean
     }
     class StrictOverlapStrategy {
+        <<ConcreteComponent>>
         +hasConflict() : newStart < existEnd AND newEnd > existStart
+        -isActiveState(state) boolean
     }
     class BufferedOverlapDecorator {
+        <<ConcreteDecorator>>
         -ConflictCheckStrategy inner
         -Duration buffer
+        +BufferedOverlapDecorator(inner, buffer)
         +hasConflict(existing, start, end) : inner.hasConflict(start-buffer, end+buffer)
     }
+    class TimeConflictValidator {
+        <<Client>>
+        -ConflictCheckStrategy conflictStrategy
+        +validate(ctx) : conflictStrategy.hasConflict(...)
+    }
 
-    ConflictCheckStrategy <|.. StrictOverlapStrategy
-    ConflictCheckStrategy <|.. BufferedOverlapDecorator
-    BufferedOverlapDecorator --> ConflictCheckStrategy : 委派（裝飾）
+    ConflictCheckStrategy <|.. StrictOverlapStrategy : ConcreteComponent
+    ConflictCheckStrategy <|.. BufferedOverlapDecorator : IS-A（實作同介面）
+    BufferedOverlapDecorator o--> ConflictCheckStrategy : HAS-A inner（包裝並委派）
+    TimeConflictValidator --> ConflictCheckStrategy : 注入（Spring @Primary 決定是否裝飾）
+
+    note for BufferedOverlapDecorator "Decorator 同時 IS-A 與 HAS-A Component：實作 ConflictCheckStrategy（可被當成一般策略注入），又持有一個 inner ConflictCheckStrategy。hasConflict() 先把時段前後各延伸 buffer，再委派 inner。因 inner 型別是介面，可層層堆疊多個 Decorator（如再包一層節假日規則）而不改任何既有類別（OCP）。"
 ```
 
 > 啟用緩衝：在 Spring 設定類別宣告 `@Bean @Primary ConflictCheckStrategy buffered(StrictOverlapStrategy base) { return new BufferedOverlapDecorator(base, Duration.ofMinutes(30)); }`
