@@ -61,19 +61,19 @@
 │  LoginView / EmployeeBorrowView / Admin Views   │
 │  AuthController / VehicleController / ...       │
 ├─────────────────────────────────────────────────┤
-│  Service Layer                                   │
+│  Service Layer                                  │
 │  BorrowingService / VehicleService /            │
 │  MaintenanceService / UserService               │
 ├─────────────────────────────────────────────────┤
-│  Domain Layer                                    │
+│  Domain Layer                                   │
 │  BorrowingRequest (State Pattern)               │
 │  Vehicle / User / MaintenanceRecord             │
-│  Role / Permission (組合模式)                   │
+│  Role / Permission (組合模式)                    │
 ├─────────────────────────────────────────────────┤
 │  Repository Interface Layer (DIP)               │
-│  IVehicleRepository / IBorrowingRepository / … │
+│  IVehicleRepository / IBorrowingRepository / …  │
 ├─────────────────────────────────────────────────┤
-│  Infrastructure Layer                            │
+│  Infrastructure Layer                           │
 │  JPA Adapters / JWT Security / Flyway Migration │
 └─────────────────────────────────────────────────┘
 ```
