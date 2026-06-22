@@ -35,7 +35,14 @@ venv/
 
 # Node
 node_modules/
+dist/
+
+# Build output
+target/
 
 # IDE
 .vscode/
 .idea/
+
+# Claude Code local settings
+.claude/
