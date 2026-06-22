@@ -1,0 +1,62 @@
+name: Package Release
+
+# 推送 v* tag 時，建置後端 JAR 與前端 dist，打包成一個 GitHub Release。
+# 與 deploy.yml 各自獨立並行：deploy.yml 負責部署到 VPS，本檔負責產生 Release 產物。
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # 建立 Release 需要寫入權限
+
+jobs:
+  package-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. 取得原始碼 ────────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. 建置後端 JAR ──────────────────────────────────────────────
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build backend JAR (skip tests)
+        working-directory: backend
+        run: mvn package -DskipTests --batch-mode --no-transfer-progress
+
+      - name: Rename backend JAR with version
+        run: mv backend/target/vehicle-management-*.jar "backend/target/vehicle-management-${{ github.ref_name }}.jar"
+
+      # ── 3. 建置前端 dist ─────────────────────────────────────────────
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Zip frontend dist
+        run: cd frontend && zip -r "../frontend-dist-${{ github.ref_name }}.zip" dist
+
+      # ── 4. 建立 GitHub Release 並附上產物 ────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true   # 自動依 commit 產生變更說明
+          files: |
+            backend/target/vehicle-management-${{ github.ref_name }}.jar
+            frontend-dist-${{ github.ref_name }}.zip
